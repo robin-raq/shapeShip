@@ -35,6 +35,7 @@ import weeklyPlansRoutes, { weeklyRetrosRouter } from './routes/weekly-plans.js'
 import { documentCommentsRouter, commentsRouter } from './routes/comments.js';
 import { setupSwagger } from './swagger.js';
 import { initializeCAIA } from './services/caia.js';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
 // Validate SESSION_SECRET in production
 if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
@@ -240,6 +241,14 @@ export function createApp(corsOrigin: string = 'http://localhost:5173'): express
   initializeCAIA().catch((err) => {
     console.warn('CAIA initialization failed:', err);
   });
+
+  // --- Error handling (MUST be after all routes) ---
+
+  // Catch requests that don't match any route → 404 JSON
+  app.use('/api', notFoundHandler);
+
+  // Catch all errors (JSON parse failures, route errors, etc.) → JSON
+  app.use(errorHandler);
 
   return app;
 }
