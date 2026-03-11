@@ -10,6 +10,9 @@ const __dirname = dirname(__filename);
 config({ path: join(__dirname, '../.env.local') });
 config({ path: join(__dirname, '../.env') });
 
+// Register process-level error handlers before anything else
+import './process-handlers.js';
+
 async function main() {
   // Load secrets from SSM in production (before importing app)
   if (process.env.NODE_ENV === 'production') {
