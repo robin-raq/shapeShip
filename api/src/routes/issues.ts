@@ -12,6 +12,7 @@ import {
   type BelongsToEntry,
 } from '../utils/document-crud.js';
 import { broadcastToUser } from '../collaboration/index.js';
+import type { QueryParam, IssueQueryRow } from '../types/db-rows.js';
 
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
@@ -79,7 +80,7 @@ const rejectIssueSchema = z.object({
 });
 
 // Helper to extract issue properties from row (without belongs_to - added separately)
-function extractIssueFromRow(row: any) {
+function extractIssueFromRow(row: IssueQueryRow) {
   const props = row.properties || {};
   return {
     id: row.id,
@@ -705,7 +706,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
     const existingIssue = existing.rows[0];
     const currentProps = existingIssue.properties || {};
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: QueryParam[] = [];
     let paramIndex = 1;
 
     const data = parsed.data;
@@ -1207,7 +1208,7 @@ router.post('/bulk', authMiddleware, async (req: Request, res: Response) => {
         }
 
         const setClauses: string[] = ['updated_at = NOW()'];
-        const values: any[] = [validIds, workspaceId];
+        const values: QueryParam[] = [validIds as unknown as QueryParam, workspaceId];
         let paramIdx = 3;
 
         if (updates.state !== undefined) {

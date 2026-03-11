@@ -3,6 +3,7 @@ import { pool } from '../db/client.js';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
 import { isWorkspaceAdmin } from '../middleware/visibility.js';
+import type { QueryParam, AccessCheckRow } from '../types/db-rows.js';
 import { handleVisibilityChange, handleDocumentConversion, invalidateDocumentCache, broadcastToUser } from '../collaboration/index.js';
 import { extractHypothesisFromContent, extractSuccessCriteriaFromContent, extractVisionFromContent, extractGoalsFromContent, checkDocumentCompleteness } from '../utils/extractHypothesis.js';
 import { loadContentFromYjsState } from '../utils/yjsConverter.js';
@@ -645,7 +646,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
     await client.query('BEGIN');
 
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: QueryParam[] = [];
     let paramIndex = 1;
 
     // Track extracted values from content (content is source of truth)

@@ -3,13 +3,14 @@ import { pool } from '../db/client.js';
 import { z } from 'zod';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
 import { authMiddleware } from '../middleware/auth.js';
+import type { QueryParam, ProgramQueryRow } from '../types/db-rows.js';
 import { logAuditEvent } from '../services/audit.js';
 
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
 
 // Helper to extract program from row
-function extractProgramFromRow(row: any) {
+function extractProgramFromRow(row: ProgramQueryRow) {
   const props = row.properties || {};
   return {
     id: row.id,
@@ -223,7 +224,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     const currentProps = existing.rows[0].properties || {};
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: QueryParam[] = [];
     let paramIndex = 1;
 
     const data = parsed.data;

@@ -11,6 +11,7 @@ import {
 import { logDocumentChange, getLatestDocumentFieldHistory } from '../utils/document-crud.js';
 import { broadcastToUser } from '../collaboration/index.js';
 import { extractText } from '../utils/document-content.js';
+import type { QueryParam, SprintQueryRow, StandupQueryRow, IssueStateRow, GroupedIssue, TipTapNode, SprintReviewData, ReviewIssueRow } from '../types/db-rows.js';
 
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
@@ -183,7 +184,7 @@ const updatePlanSchema = z.object({
 
 // Helper to extract sprint from row
 // Dates and status are computed on frontend from sprint_number + workspace.sprint_start_date
-function extractSprintFromRow(row: any) {
+function extractSprintFromRow(row: SprintQueryRow) {
   const props = row.properties || {};
   return {
     id: row.id,
@@ -606,7 +607,7 @@ router.get('/my-week', authMiddleware, async (req: Request, res: Response) => {
     const daysRemaining = isHistorical ? 0 : Math.max(0, Math.ceil((targetSprintEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
     // Build dynamic WHERE clause for issue filters
-    const params: any[] = [workspaceId, targetSprintNumber, userId, isAdmin];
+    const params: QueryParam[] = [workspaceId, targetSprintNumber, userId, isAdmin];
     let filterConditions = '';
 
     if (state && typeof state === 'string') {
@@ -664,7 +665,7 @@ router.get('/my-week', authMiddleware, async (req: Request, res: Response) => {
     const groupedData: Record<string, {
       sprint: { id: string; name: string; sprint_number: number };
       program: { id: string; name: string; prefix: string } | null;
-      issues: any[];
+      issues: GroupedIssue[];
     }> = {};
 
     for (const row of result.rows) {
@@ -709,9 +710,9 @@ router.get('/my-week', authMiddleware, async (req: Request, res: Response) => {
     // Calculate totals
     const totalIssues = groups.reduce((sum, g) => sum + g.issues.length, 0);
     const completedIssues = groups.reduce((sum, g) =>
-      sum + g.issues.filter((i: any) => i.state === 'done').length, 0);
+      sum + g.issues.filter((i: GroupedIssue) => i.state === 'done').length, 0);
     const inProgressIssues = groups.reduce((sum, g) =>
-      sum + g.issues.filter((i: any) => i.state === 'in_progress' || i.state === 'in_review').length, 0);
+      sum + g.issues.filter((i: GroupedIssue) => i.state === 'in_progress' || i.state === 'in_review').length, 0);
 
     res.json({
       groups,
@@ -1050,7 +1051,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
     const currentProps = existing.rows[0].properties || {};
     const programId = existing.rows[0].program_id;
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: QueryParam[] = [];
     let paramIndex = 1;
 
     const data = parsed.data;
@@ -1790,7 +1791,7 @@ const createStandupSchema = z.object({
 });
 
 // Helper to format standup response
-function formatStandupResponse(row: any) {
+function formatStandupResponse(row: StandupQueryRow) {
   return {
     id: row.id,
     sprint_id: row.parent_id,
@@ -2019,7 +2020,7 @@ const sprintReviewSchema = z.object({
 });
 
 // Helper to generate pre-filled sprint review content
-async function generatePrefilledReviewContent(sprintData: any, issues: any[]) {
+async function generatePrefilledReviewContent(sprintData: SprintReviewData, issues: ReviewIssueRow[]) {
   // Categorize issues
   const issuesPlanned = issues.filter(i => {
     const props = i.properties || {};
@@ -2044,7 +2045,7 @@ async function generatePrefilledReviewContent(sprintData: any, issues: any[]) {
   });
 
   // Build TipTap content with suggested sections
-  const content: any = {
+  const content: TipTapNode = {
     type: 'doc',
     content: [
       {
@@ -2061,7 +2062,7 @@ async function generatePrefilledReviewContent(sprintData: any, issues: any[]) {
 
   // Add plan section if sprint has one
   if (sprintData.plan) {
-    content.content.push(
+    content.content!.push(
       {
         type: 'heading',
         attrs: { level: 3 },
@@ -2075,7 +2076,7 @@ async function generatePrefilledReviewContent(sprintData: any, issues: any[]) {
   }
 
   // Add issues summary section
-  content.content.push(
+  content.content!.push(
     {
       type: 'heading',
       attrs: { level: 3 },
@@ -2118,7 +2119,7 @@ async function generatePrefilledReviewContent(sprintData: any, issues: any[]) {
 
   // Add completed issues list
   if (issuesCompleted.length > 0) {
-    content.content.push(
+    content.content!.push(
       {
         type: 'heading',
         attrs: { level: 3 },
@@ -2138,7 +2139,7 @@ async function generatePrefilledReviewContent(sprintData: any, issues: any[]) {
   }
 
   // Add next steps placeholder
-  content.content.push(
+  content.content!.push(
     {
       type: 'heading',
       attrs: { level: 3 },
@@ -2426,7 +2427,7 @@ router.patch('/:id/review', authMiddleware, async (req: Request, res: Response) 
 
     // Build update query
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: QueryParam[] = [];
     let paramIndex = 1;
 
     if (content !== undefined) {

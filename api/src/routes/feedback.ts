@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
+import type { FeedbackQueryRow } from '../types/db-rows.js';
 
 type RouterType = ReturnType<typeof Router>;
 
@@ -24,7 +25,7 @@ const rejectFeedbackSchema = z.object({
 });
 
 // Helper to extract feedback from row
-function extractFeedbackFromRow(row: any, programPrefix?: string | null) {
+function extractFeedbackFromRow(row: FeedbackQueryRow, programPrefix?: string | null) {
   const props = row.properties || {};
   return {
     id: row.id,
