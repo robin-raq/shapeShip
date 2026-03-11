@@ -221,6 +221,12 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       END,
       d.updated_at DESC`;
 
+    // Pagination: default 50 rows, max 200
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
+    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+    query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit as any, offset as any);
+
     const result = await pool.query(query, params);
 
     // Extract issues and batch-fetch associations to avoid N+1 queries
