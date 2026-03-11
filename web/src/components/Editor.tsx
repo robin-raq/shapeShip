@@ -496,6 +496,9 @@ export function Editor({
       }
       // Destroy IndexedDB persistence
       indexeddbProvider.destroy();
+      // Destroy Y.Doc to stop BroadcastChannel listeners from y-indexeddb
+      // Without this, old Y.Docs continue processing cross-tab messages after unmount
+      ydoc.destroy();
       // Clear provider state
       setProvider(null);
       setConnectedUsers([]);
