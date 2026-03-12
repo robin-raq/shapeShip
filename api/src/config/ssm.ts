@@ -40,6 +40,11 @@ export async function loadProductionSecrets(): Promise<void> {
     return; // Use .env files for local dev
   }
 
+  if (process.env.USE_SSM !== 'true') {
+    console.log('USE_SSM not set — using directly-injected environment variables');
+    return; // Non-AWS platforms (Railway, etc.) inject env vars directly
+  }
+
   const environment = process.env.ENVIRONMENT || 'prod';
   const basePath = `/ship/${environment}`;
 

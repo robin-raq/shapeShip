@@ -1,0 +1,44 @@
+# Railway deployment — builds everything from source in a single container.
+#
+# Differences from production Dockerfile:
+#   - Production (AWS): builds locally, copies pre-built dist/ into image
+#   - Railway: builds inside Docker (simpler CI, Railway handles caching)
+#
+# This serves both the API and the static frontend from the same process.
+# The Express app serves web/dist/ via express.static() in production mode.
+
+FROM node:20-slim
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm@9.15.4
+
+# Copy package files first for Docker layer caching.
+# Dependencies change less often than source code, so this layer is cached
+# across most deploys — saving ~2 minutes of install time.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY shared/package.json ./shared/
+COPY api/package.json ./api/
+COPY web/package.json ./web/
+
+# Install all dependencies (devDeps needed for TypeScript build)
+RUN pnpm install --frozen-lockfile
+
+# Copy source code (changes every deploy — invalidates cache from here)
+COPY shared/ ./shared/
+COPY api/ ./api/
+COPY web/ ./web/
+
+# Build all packages: shared types → API + Web
+# shared must build first (api and web import from @ship/shared)
+RUN pnpm build
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+EXPOSE 3000
+
+# Start sequence: run migrations → seed (Railway DB starts empty) → start server
+WORKDIR /app/api
+CMD ["sh", "-c", "node dist/db/migrate.js && node dist/db/seed.js && node dist/index.js"]

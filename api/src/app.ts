@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { csrfSync } from 'csrf-sync';
 import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth.js';
@@ -246,6 +248,28 @@ export function createApp(corsOrigin: string = 'http://localhost:5173'): express
 
   // Catch requests that don't match any route → 404 JSON
   app.use('/api', notFoundHandler);
+
+  // --- Static file serving (production single-service deployment) ---
+  // Serve the Vite-built frontend from the same Express server.
+  // On AWS, CloudFront + S3 handles this instead. On Railway, the API
+  // serves everything from one process.
+  if (process.env.NODE_ENV === 'production') {
+    const __appFilename = fileURLToPath(import.meta.url);
+    const __appDirname = dirname(__appFilename);
+    const staticPath = join(__appDirname, '../../web/dist');
+
+    // Serve static assets (JS, CSS, images) with long cache
+    app.use(express.static(staticPath, {
+      maxAge: '1y',       // Vite hashes filenames — safe to cache indefinitely
+      index: false,       // Don't serve index.html for directory requests (SPA fallback handles it)
+    }));
+
+    // SPA fallback — serve index.html for all non-API, non-file routes.
+    // React Router handles client-side routing from there.
+    app.get('*', (_req, res) => {
+      res.sendFile(join(staticPath, 'index.html'));
+    });
+  }
 
   // Catch all errors (JSON parse failures, route errors, etc.) → JSON
   app.use(errorHandler);

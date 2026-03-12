@@ -14,7 +14,9 @@ config({ path: join(__dirname, '../.env') });
 import './process-handlers.js';
 
 async function main() {
-  // Load secrets from SSM in production (before importing app)
+  // Load secrets from SSM in production (before importing app).
+  // On non-AWS platforms (Railway, etc.), loadProductionSecrets() returns
+  // early when USE_SSM is not set, falling back to injected env vars.
   if (process.env.NODE_ENV === 'production') {
     const { loadProductionSecrets } = await import('./config/ssm.js');
     await loadProductionSecrets();
