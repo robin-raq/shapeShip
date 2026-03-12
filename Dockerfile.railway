@@ -11,12 +11,15 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Install pnpm
+# Install git (postinstall script uses 'git config') and pnpm
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm@9.15.4
 
+# Initialize an empty git repo so postinstall 'git config' doesn't fail.
+# Docker COPY doesn't include .git/, but the postinstall script expects it.
+RUN git init
+
 # Copy package files first for Docker layer caching.
-# Dependencies change less often than source code, so this layer is cached
-# across most deploys — saving ~2 minutes of install time.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY shared/package.json ./shared/
 COPY api/package.json ./api/
@@ -25,7 +28,8 @@ COPY web/package.json ./web/
 # Install all dependencies (devDeps needed for TypeScript build)
 RUN pnpm install --frozen-lockfile
 
-# Copy source code (changes every deploy — invalidates cache from here)
+# Copy root tsconfig (shared/api/web extend from it) and source code
+COPY tsconfig.json ./
 COPY shared/ ./shared/
 COPY api/ ./api/
 COPY web/ ./web/
