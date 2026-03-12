@@ -272,8 +272,8 @@ function extractSprintFromRow(row: SprintQueryRow) {
     issue_count: parseInt(row.issue_count) || 0,
     completed_count: parseInt(row.completed_count) || 0,
     started_count: parseInt(row.started_count) || 0,
-    has_plan: row.has_plan === true || row.has_plan === 't',
-    has_retro: row.has_retro === true || row.has_retro === 't',
+    has_plan: row.has_plan === true,
+    has_retro: row.has_retro === true,
     // Retro outcome summary (populated if retro exists)
     retro_outcome: row.retro_outcome || null,
     retro_id: row.retro_id || null,
@@ -1889,7 +1889,7 @@ router.get('/:id/standups', authMiddleware, async (req: Request, res: Response) 
     const standups = await Promise.all(
       result.rows.map(async (row) => {
         const formatted = formatStandupResponse(row);
-        formatted.content = await transformIssueLinks(formatted.content, workspaceId, issueMap);
+        formatted.content = await transformIssueLinks(formatted.content, workspaceId, issueMap) as TipTapNode | null;
         return formatted;
       })
     );

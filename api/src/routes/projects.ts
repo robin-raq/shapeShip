@@ -17,11 +17,10 @@ type InferredProjectStatus = 'active' | 'planned' | 'completed' | 'backlog' | 'a
 
 // Helper to extract project from row with computed ice_score
 function extractProjectFromRow(row: ProjectQueryRow) {
-  const props: Record<string, unknown> = row.properties || {};
-  // ICE values can be null (not yet set) - don't default to 3
-  const impact = (props.impact ?? null) as number | null;
-  const confidence = (props.confidence ?? null) as number | null;
-  const ease = (props.ease ?? null) as number | null;
+  const props = row.properties || {};
+  const impact = props.impact ?? null;
+  const confidence = props.confidence ?? null;
+  const ease = props.ease ?? null;
 
   return {
     id: row.id,
@@ -122,7 +121,7 @@ const projectRetroSchema = z.object({
 
 // Helper to generate pre-filled retro content for a project
 async function generatePrefilledRetroContent(projectData: ProjectQueryRow, sprints: Record<string, unknown>[], issues: IssueStateRow[]) {
-  const props: Record<string, unknown> = projectData.properties || {};
+  const props = projectData.properties || {};
 
   // Categorize issues by state
   const completedIssues = issues.filter(i => i.state === 'done');
