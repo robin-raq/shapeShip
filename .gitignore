@@ -42,6 +42,9 @@ Thumbs.db
 # Claude agents
 .claude/agents/
 
+# Claude Code dev server config
+.claude/launch.json
+
 # Playwright MCP screenshots
 .playwright-mcp/
 
@@ -113,3 +116,12 @@ vendor/
 
 # Vite PWA dev artifacts
 web/dev-dist/
+
+# Personal study reference (interview prep)
+STUDY_GUIDE.md
+STUDY_GUIDE_cursor.md
+Codebase_Orientation_Checklist.md
+Codebase_Orientation_Checklist.pdf
+
+# Test coverage output
+api/coverage/
