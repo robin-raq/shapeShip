@@ -49,6 +49,7 @@
     "cmdk": "^1.1.1",
     "diff-match-patch": "^1.0.5",
     "emoji-picker-react": "^4.16.1",
+    "highlight.js": "^11.11.1",
     "idb-keyval": "^6.2.2",
     "lowlight": "^3.3.0",
     "react": "^18.3.1",
