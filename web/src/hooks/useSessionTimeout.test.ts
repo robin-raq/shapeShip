@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSessionTimeout } from './useSessionTimeout';
+import { clearCsrfToken } from '@/lib/api';
 
 /**
  * Unit Tests for useSessionTimeout Hook
@@ -17,19 +18,26 @@ const ABSOLUTE_SESSION_TIMEOUT_MS = 12 * 60 * 60 * 1000; // 12 hours
 const ABSOLUTE_WARNING_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes before absolute timeout
 const ACTIVITY_THROTTLE_MS = 30 * 1000; // 30 seconds
 
-// Mock fetch globally
+// Mock fetch globally — must include headers for isJsonResponse() checks in apiPost
 const mockFetch = vi.fn();
+const mockHeaders = {
+  get: (name: string) => (name === 'content-type' ? 'application/json' : null),
+};
 
 describe('useSessionTimeout', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    // Reset fetch mock
+    // Reset fetch mock and CSRF token cache
     mockFetch.mockReset();
-    // Default: return successful session info
+    clearCsrfToken();
+    // Default: return successful session info (includes headers for isJsonResponse)
     mockFetch.mockResolvedValue({
       ok: true,
+      status: 200,
+      headers: mockHeaders,
       json: async () => ({
         success: true,
+        token: 'test-csrf-token',
         data: {
           createdAt: new Date().toISOString(),
           expiresAt: new Date(Date.now() + SESSION_TIMEOUT_MS).toISOString(),
@@ -146,7 +154,7 @@ describe('useSessionTimeout', () => {
     it('does NOT call onTimeout if dismissed before 0', async () => {
       const onTimeout = vi.fn();
       // Mock successful extend-session response
-      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+      mockFetch.mockResolvedValue({ ok: true, status: 200, headers: mockHeaders, json: async () => ({ success: true, token: 'test-csrf-token' }) });
 
       const { result } = renderHook(() => useSessionTimeout(onTimeout));
 
@@ -174,7 +182,7 @@ describe('useSessionTimeout', () => {
   describe('Activity Reset', () => {
     it('resetTimer() hides warning modal', async () => {
       const onTimeout = vi.fn();
-      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+      mockFetch.mockResolvedValue({ ok: true, status: 200, headers: mockHeaders, json: async () => ({ success: true, token: 'test-csrf-token' }) });
 
       const { result } = renderHook(() => useSessionTimeout(onTimeout));
 
@@ -195,7 +203,7 @@ describe('useSessionTimeout', () => {
 
     it('resetTimer() resets lastActivity to now', async () => {
       const onTimeout = vi.fn();
-      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+      mockFetch.mockResolvedValue({ ok: true, status: 200, headers: mockHeaders, json: async () => ({ success: true, token: 'test-csrf-token' }) });
 
       const { result } = renderHook(() => useSessionTimeout(onTimeout));
       const initialActivity = result.current.lastActivity;
@@ -215,7 +223,7 @@ describe('useSessionTimeout', () => {
 
     it('after resetTimer(), warning appears 14 min later (not sooner)', async () => {
       const onTimeout = vi.fn();
-      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+      mockFetch.mockResolvedValue({ ok: true, status: 200, headers: mockHeaders, json: async () => ({ success: true, token: 'test-csrf-token' }) });
 
       const { result } = renderHook(() => useSessionTimeout(onTimeout));
 
@@ -249,7 +257,7 @@ describe('useSessionTimeout', () => {
 
     it('resetTimer() clears countdown interval', async () => {
       const onTimeout = vi.fn();
-      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+      mockFetch.mockResolvedValue({ ok: true, status: 200, headers: mockHeaders, json: async () => ({ success: true, token: 'test-csrf-token' }) });
 
       const { result } = renderHook(() => useSessionTimeout(onTimeout));
 
@@ -282,6 +290,8 @@ describe('useSessionTimeout', () => {
       const sessionCreatedAt = new Date().toISOString();
       mockFetch.mockResolvedValue({
         ok: true,
+        status: 200,
+        headers: mockHeaders,
         json: async () => ({
           success: true,
           data: {
@@ -314,6 +324,8 @@ describe('useSessionTimeout', () => {
       const sessionCreatedAt = new Date().toISOString();
       mockFetch.mockResolvedValue({
         ok: true,
+        status: 200,
+        headers: mockHeaders,
         json: async () => ({
           success: true,
           data: {
@@ -344,6 +356,8 @@ describe('useSessionTimeout', () => {
       const sessionCreatedAt = new Date().toISOString();
       mockFetch.mockResolvedValue({
         ok: true,
+        status: 200,
+        headers: mockHeaders,
         json: async () => ({
           success: true,
           data: {
@@ -389,6 +403,8 @@ describe('useSessionTimeout', () => {
       ).toISOString();
       mockFetch.mockResolvedValue({
         ok: true,
+        status: 200,
+        headers: mockHeaders,
         json: async () => ({
           success: true,
           data: {
@@ -437,6 +453,8 @@ describe('useSessionTimeout', () => {
       ).toISOString();
       mockFetch.mockResolvedValue({
         ok: true,
+        status: 200,
+        headers: mockHeaders,
         json: async () => ({
           success: true,
           data: {
@@ -469,6 +487,8 @@ describe('useSessionTimeout', () => {
       const sessionCreatedAt = new Date(Date.now() - (ABSOLUTE_SESSION_TIMEOUT_MS - 10 * 60 * 1000)).toISOString();
       mockFetch.mockResolvedValue({
         ok: true,
+        status: 200,
+        headers: mockHeaders,
         json: async () => ({
           success: true,
           data: {
@@ -622,7 +642,7 @@ describe('useSessionTimeout', () => {
 
     it('clears interval when warning dismissed', async () => {
       const onTimeout = vi.fn();
-      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+      mockFetch.mockResolvedValue({ ok: true, status: 200, headers: mockHeaders, json: async () => ({ success: true, token: 'test-csrf-token' }) });
 
       const { result } = renderHook(() => useSessionTimeout(onTimeout));
 
@@ -666,6 +686,8 @@ describe('useSessionTimeout', () => {
       ).toISOString();
       mockFetch.mockResolvedValue({
         ok: true,
+        status: 200,
+        headers: mockHeaders,
         json: async () => ({
           success: true,
           data: {
