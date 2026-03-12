@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import svgr from 'vite-plugin-svgr';
+import { visualizer } from 'rollup-plugin-visualizer';
 import { resolve } from 'path';
 import { readFileSync, existsSync } from 'fs';
 
@@ -46,6 +47,13 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
+      process.env.BUNDLE_ANALYZE === '1' &&
+        visualizer({
+          filename: resolve(__dirname, '../../audit/stats.html'),
+          open: false,
+          gzipSize: true,
+          brotliSize: true,
+        }),
       svgr({
         // Allow importing SVGs as React components with ?react suffix
         // e.g., import CheckIcon from '@uswds/uswds/dist/img/usa-icons/check.svg?react'
