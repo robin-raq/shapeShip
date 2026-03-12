@@ -76,19 +76,21 @@ Database query results flowed through the codebase as `any`, meaning TypeScript 
 
 | Metric | Before (original) | After Round 1 | After Round 2 | Notes |
 |--------|-------------------|---------------|---------------|-------|
-| Explicit `any` in source | 48 | ~31 | 17 | -65% total reduction |
+| Explicit `any` in source | 48 | ~31 | 14 | -71% total reduction |
 | Typed row interfaces | 0 | 15 (inaccurate) | 13 (SQL-verified) | Each matches its query |
 | Properties typing | `Record<string, unknown>` | `Record<string, unknown>` | Per-type interfaces | 5 property types |
 | False column declarations | N/A | ~5 per row type | 0 | Rows match SELECT |
 | `boolean | string` smells | N/A | 3 | 0 | Verified via pg driver |
 | Escape hatches (`[key: string]`) | N/A | 2 | 0 | Removed |
 
-**Remaining 17 `any` types:**
-- 11 in `yjsConverter.ts` — Yjs XML↔JSON tree walking (genuinely hard to type without a recursive generic)
+**Round 3** (commit `1791993`): Added ESLint `@typescript-eslint/no-explicit-any` as a `warn` rule across the API package. This prevents regression — new `any` types now surface during `pnpm lint` and CI, even though existing violations are grandfathered as warnings.
+
+**Remaining 14 `any` types:**
+- 8 in `yjsConverter.ts` — Yjs XML↔JSON tree walking (genuinely hard to type without a recursive generic)
 - 3 `as any` casts for pg `params.push()` — array type narrowing limitation
 - 3 in collaboration/other files — Yjs event handlers
 
-**Commits:** `e9e8e60` (Round 1), pending (Round 2 — SQL-accurate rewrite)
+**Commits:** `e9e8e60` (Round 1), `88fd7c2` (Round 2 — SQL-accurate rewrite), `1791993` (ESLint rule)
 
 ---
 
@@ -149,6 +151,8 @@ Converted 5 heavy pages to `React.lazy()` imports in `web/src/main.tsx`:
 
 **Y.Doc memory leak fix:** Added `ydoc.destroy()` on Editor unmount to prevent stale BroadcastChannel listeners from accumulating across navigation.
 
+**Highlight.js language reduction** (commit `cedc09f`): The TipTap code block extension registered all 36 common highlight.js languages (~102 KB gzipped). Reduced to 10 languages that actually appear in Ship's codebase (JavaScript, TypeScript, Python, SQL, CSS, HTML, JSON, Bash, Markdown, YAML). This shrinks the editor chunk from 836 KB to 734 KB (-12%).
+
 ### After
 
 | Metric | Before | After | Change |
@@ -156,9 +160,10 @@ Converted 5 heavy pages to `React.lazy()` imports in `web/src/main.tsx`:
 | Pages code-split | 0 | 5 | Route-level splitting |
 | Emoji picker loading | Eager (271 KB) | Lazy (on demand) | -271 KB from initial load |
 | Editor deps in main chunk | Included (~400 KB) | Separate chunk | Loaded only on document pages |
+| Highlight.js languages | 36 (all common) | 10 (project-relevant) | Editor chunk 836 KB → 734 KB |
 | Y.Doc cleanup on unmount | None (memory leak) | `ydoc.destroy()` | Prevents BroadcastChannel buildup |
 
-**Commits:** `5a38369` (lazy-load), `a1f6222` (Y.Doc fix)
+**Commits:** `5a38369` (lazy-load), `a1f6222` (Y.Doc fix), `cedc09f` (highlight.js language reduction)
 
 ---
 
@@ -208,8 +213,11 @@ Ship's per-workspace data is typically <1K documents. OFFSET is simpler to imple
 | `/api/issues` payload | 304 rows | 50 rows (default) | -84% payload |
 | Max rows per request | Unbounded | 200 (server-enforced) | Abuse prevention |
 | Pagination tests | 0 | 4 test cases | New `pagination.test.ts` |
+| `content` in issues list | Included (full TipTap JSON) | Omitted | Loaded on individual GET only |
 
-**Commit:** `9beb9ad` — feat(api): add LIMIT/OFFSET pagination to documents and issues endpoints
+**Content field removal** (commit `c09f618`): The `/api/issues` list endpoint previously returned the full `content` column (TipTap JSON) for every issue in the list, even though the list view only displays title and metadata. Removing `content` from the SELECT reduces payload size per issue row significantly — the field is still returned on individual `GET /api/issues/:id` requests where the editor needs it.
+
+**Commits:** `9beb9ad` (pagination), `c09f618` (content field removal)
 
 ---
 
@@ -334,6 +342,9 @@ Root Cause                          Files Affected    Fix Applied
 
 6. pg/bcryptjs not in root deps     71 E2E files      Added to root devDependencies
    (pnpm strict isolation)
+
+7. progress-reporter.ts ENOENT      1 file            Defensive mkdirSync in
+   crash in writeErrorLog()          (E2E reporter)    onBegin() + writeErrorLog()
 ```
 
 **Key decision — `test.projects` vs `defineWorkspace`:**
@@ -354,6 +365,7 @@ Root Cause                          Files Affected    Fix Applied
 | Test run duration | Errors + noise | ~47s clean | Stable baseline |
 | `pnpm type-check` | Failed | Clean | Unblocked |
 | `pnpm build:api` | Failed | Clean | Unblocked E2E |
+| E2E progress-reporter | ENOENT crash | Defensive mkdirSync | Stable error logging |
 
 ---
 
@@ -487,9 +499,9 @@ Two WCAG AA violations:
 
 | # | Category | Key Metric | Before | After |
 |---|----------|-----------|--------|-------|
-| 1 | Type Safety | `any` types in API source | 48 | 17 (-65%) |
+| 1 | Type Safety | `any` types in API source | 48 | 14 (-71%) |
 | 2 | Bundle Size | Editor chunk size | 836KB | 734KB (-12%, 10 langs vs 36) |
-| 3 | API Response Time | Max rows per request | Unbounded | 200 (paginated) |
+| 3 | API Response Time | Max rows per request | Unbounded | 200 (paginated, `content` stripped from list) |
 | 4 | DB Query Efficiency | Correlated subqueries | 35 | 0 (3 CTEs) |
 | 5 | Test Infrastructure | Unit suite pass rate | 36.7% (44/120 discovered) | 100% (49/49) |
 | 6 | Runtime Errors | Global error handler | None | Full coverage |
@@ -499,14 +511,14 @@ Two WCAG AA violations:
 
 | Metric | Value |
 |--------|-------|
-| Total commits | 23 |
-| Files created | 8 new files |
-| Files modified | 36 files |
-| Net lines changed | +2,642 / -336 across 44 files |
+| Total commits | 23 (20 implementation + 3 docs) |
+| Files created | 13 new files |
+| Files modified | 31 existing files |
+| Net lines changed | +2,851 / -351 across 44 files |
 | Tests passing | 49/49 suites, 621/621 tests (100%) |
-| ESLint warnings | 63 `any` (warn, not error) |
+| ESLint `any` warnings | Enforced via `@typescript-eslint/no-explicit-any` (warn) |
 | Build status | Clean (editor 734KB, main 806KB) |
 
 ---
 
-*Generated from Phase 1 audit baseline (2026-03-09) and Phase 2 remediation (2026-03-09 to 2026-03-12).*
+*Generated from Phase 1 audit baseline (2026-03-09) and Phase 2 remediation (2026-03-09 to 2026-03-12). Last updated 2026-03-12.*
