@@ -409,6 +409,12 @@ Maps 6 error codes: `VALIDATION_ERROR` (400), `BAD_REQUEST` (400), `UNAUTHORIZED
 - Accessible "Page not found" component with navigation links
 - Registered as fallback route in React Router
 
+**5. y-websocket offline error flooding fix** (`web/src/components/Editor.tsx`, +48 lines)
+- Wraps `ws.send()` with `readyState === OPEN` guard to prevent throws on CLOSING/CLOSED sockets
+- Pauses y-websocket reconnection while `navigator.onLine === false` (offline/online events)
+- Downgrades `connection-error` events to `console.debug` to suppress noisy error logs
+- Result: 19 uncaught exceptions during 90s offline → 0
+
 ### After
 
 | Metric | Before | After | Change |
@@ -482,7 +488,7 @@ Two WCAG AA violations:
 | # | Category | Key Metric | Before | After |
 |---|----------|-----------|--------|-------|
 | 1 | Type Safety | `any` types in API source | 48 | 17 (-65%) |
-| 2 | Bundle Size | Pages code-split | 0 | 5 + emoji picker |
+| 2 | Bundle Size | Editor chunk size | 836KB | 734KB (-12%, 10 langs vs 36) |
 | 3 | API Response Time | Max rows per request | Unbounded | 200 (paginated) |
 | 4 | DB Query Efficiency | Correlated subqueries | 35 | 0 (3 CTEs) |
 | 5 | Test Infrastructure | Unit suite pass rate | 36.7% (44/120 discovered) | 100% (49/49) |
@@ -493,14 +499,14 @@ Two WCAG AA violations:
 
 | Metric | Value |
 |--------|-------|
-| Commits (Phase 2 audit) | 9 |
-| Commits (test infra) | Pending (uncommitted) |
-| Files created | 5 new files |
-| Files modified | ~15 files |
-| Net lines added | ~600 |
-| Tests added | 12 new test cases |
-| Tests fixed | 37 (stale/broken assertions) |
+| Total commits | 23 |
+| Files created | 8 new files |
+| Files modified | 36 files |
+| Net lines changed | +2,642 / -336 across 44 files |
+| Tests passing | 49/49 suites, 621/621 tests (100%) |
+| ESLint warnings | 63 `any` (warn, not error) |
+| Build status | Clean (editor 734KB, main 806KB) |
 
 ---
 
-*Generated from Phase 1 audit baseline (2026-03-09) and Phase 2+3 remediation (2026-03-09 to 2026-03-11).*
+*Generated from Phase 1 audit baseline (2026-03-09) and Phase 2 remediation (2026-03-09 to 2026-03-12).*
