@@ -521,4 +521,71 @@ Two WCAG AA violations:
 
 ---
 
+---
+
+## Phase 2 Continued: Remaining Audit Findings (2026-03-12)
+
+Four additional audit findings were addressed in this session:
+
+### Finding #13: Programs & Weekly-Plans API Test Coverage
+
+**Problem:** The `programs.ts` (10 endpoints including merge) and `weekly-plans.ts` (8+ endpoints including retros and allocation grid) route files had zero test coverage.
+
+**What Changed:**
+- Created `api/src/routes/programs.test.ts` — 19 integration tests covering CRUD, RACI fields, associated issues/projects/sprints, merge preview, merge execution, and auth
+- Created `api/src/routes/weekly-plans.test.ts` — 20 integration tests covering plans (idempotent create, query, history), retros (with plan-reference auto-populate), allocation grid, and auth
+- Follows the `issues.test.ts` pattern: `createApp()` + `supertest` + real PostgreSQL with per-test isolation via `testRunId`
+
+**After:** 520 tests passing (was 493)
+
+### Finding #15: Duplicate Backlinks API Calls
+
+**Problem:** `BacklinksPanel.tsx` used raw `fetch()` with `setInterval(fetchBacklinks, 5000)` — no deduplication, no caching, manual `cancelled` flag. Every mounted panel made independent network requests.
+
+**What Changed:**
+- Created `web/src/hooks/useBacklinksQuery.ts` — TanStack Query hook with `refetchInterval: 30_000` (6x slower than the 5s polling) and `staleTime: 10_000`
+- Refactored `BacklinksPanel.tsx` to use the hook, removing ~30 lines of manual fetch/interval/cancellation code
+- Follows existing pattern (`useActionItemsQuery`, `useStandupStatusQuery`)
+
+**After:** Backlinks requests are deduplicated across components, cached, and poll at 30s intervals instead of 5s
+
+### Finding #16: Structured Server Logging
+
+**Problem:** API used raw `console.log`/`console.error` throughout — no structured JSON output, no log levels, no request correlation.
+
+**What Changed:**
+- Installed `pino` + `pino-http` + `pino-pretty` (dev)
+- Created `api/src/config/logger.ts` — configured with `level: 'silent'` in test mode
+- Added `pino-http` middleware to `app.ts` for HTTP request logging
+- Replaced `console.*` calls with structured `logger.*` in core files: `index.ts`, `errorHandler.ts`, `db/client.ts`, `collaboration/index.ts`, `db/migrate.ts`, `db/seed.ts`
+
+**After:** Production logs emit JSON with request ID correlation; dev logs use `pino-pretty` for readability; test output stays clean
+
+### Finding #5: Multi-User Collaboration E2E Tests
+
+**Problem:** No E2E test verified that two users editing the same document see each other's changes via Yjs CRDT sync.
+
+**What Changed:**
+- Created `e2e/collaboration-sync.spec.ts` — 3 Playwright tests using two independent browser contexts
+  - User A types → User B sees it
+  - User B types → User A sees it
+  - Both type simultaneously → CRDT convergence (both see merged content, both converge to same state)
+- Uses `expect().toPass()` retry pattern for sync timing resilience
+- Added `createContext()` helper that applies `ship:disableActionItemsModal` localStorage flag — the `isolated-env.ts` fixture only suppresses the Action Items modal on the default context, but collaboration tests create manual contexts via `browser.newContext()` which bypass it
+- Set `test.setTimeout(90_000)` — collaboration tests need 2 browser contexts, 2 logins, 2 navigations, and WebSocket sync, which exceeds the default 60s
+- Removed `deleteDocument` cleanup — testcontainer DB is ephemeral per worker, so per-doc cleanup is unnecessary and was consuming timeout budget
+
+**After:** All 3 CRDT sync tests passing end-to-end (11.6s, 3.8s, 4.2s)
+
+### Updated Totals
+
+| Metric | Value |
+|--------|-------|
+| Unit tests passing | 520 (was 493, +27 new) |
+| New files created | `programs.test.ts`, `weekly-plans.test.ts`, `useBacklinksQuery.ts`, `logger.ts`, `collaboration-sync.spec.ts` |
+| Files modified | `BacklinksPanel.tsx`, `app.ts`, `index.ts`, `errorHandler.ts`, `db/client.ts`, `collaboration/index.ts`, `db/migrate.ts`, `db/seed.ts` |
+| Dependencies added | `pino`, `pino-http`, `pino-pretty` (dev) |
+
+---
+
 *Generated from Phase 1 audit baseline (2026-03-09) and Phase 2 remediation (2026-03-09 to 2026-03-12). Last updated 2026-03-12.*

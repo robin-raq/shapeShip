@@ -409,7 +409,9 @@ curl -H "Authorization: Bearer $SHIP_API_TOKEN" \
 
 ## Deployment
 
-### Architecture
+Ship supports two deployment targets. The same codebase runs on both — a `USE_SSM` environment variable controls which secrets backend is used.
+
+### Target 1: AWS GovCloud (Production)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -453,30 +455,93 @@ curl -H "Authorization: Bearer $SHIP_API_TOKEN" \
                     └─────────────────┘       └─────────────────┘
 ```
 
-### Container
+**Infrastructure:**
+- **Frontend**: S3 + CloudFront (static files, SPA routing via CloudFront Function)
+- **API**: Elastic Beanstalk (Docker) with ALB
+- **Database**: Aurora Serverless v2 (PostgreSQL)
+- **Files**: S3 (attachments)
+- **Secrets**: SSM Parameter Store (`USE_SSM=true`)
+- **IaC**: Terraform (`terraform/` directory)
 
-Single Docker container:
+**AWS Container** (builds pre-compiled `dist/`):
 
 ```dockerfile
-# Dockerfile
+# Dockerfile — copies pre-built artifacts
 FROM node:20-slim
-
 WORKDIR /app
 COPY api/dist ./dist
 COPY api/package.json ./
-
 RUN npm ci --production
-
 EXPOSE 3000
 CMD ["node", "dist/index.js"]
 ```
 
-### Infrastructure
+### Target 2: Railway (Demo/Staging)
 
-- **Frontend**: S3 + CloudFront (static files)
-- **API**: Elastic Beanstalk (Docker) or ECS Fargate
-- **Database**: Aurora Serverless v2 (PostgreSQL)
-- **Files**: S3 (attachments)
+```
+┌─────────────────────────────────────────────┐
+│            Railway Service                    │
+│                                              │
+│  Express (single process)                    │
+│  ├── /api/*           → REST routes          │
+│  ├── /collaboration/* → WebSocket (Yjs)      │
+│  └── /*               → express.static()     │
+│                          + SPA fallback       │
+│                                              │
+│          ┌──────────────────────┐             │
+│          │  Railway PostgreSQL  │             │
+│          │  (auto-provisioned)  │             │
+│          └──────────────────────┘             │
+└─────────────────────────────────────────────┘
+```
+
+**Infrastructure:**
+- **Everything**: Single Railway service (Express serves API + static frontend)
+- **Database**: Railway PostgreSQL plugin (`DATABASE_URL` auto-injected)
+- **Secrets**: Direct environment variables (no SSM)
+- **Config**: `railway.json` + `Dockerfile.railway`
+
+**Railway Container** (builds from source):
+
+```dockerfile
+# Dockerfile.railway — full build inside Docker
+FROM node:20-slim
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends git
+RUN npm install -g pnpm@9.15.4
+RUN git init
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY shared/package.json api/package.json web/package.json ./
+RUN pnpm install --frozen-lockfile
+COPY tsconfig.json shared/ api/ web/ ./
+RUN pnpm build
+ENV NODE_ENV=production PORT=3000
+CMD ["sh", "-c", "node dist/db/migrate.js && node dist/db/seed.js && node dist/index.js"]
+```
+
+### Cloud-Agnostic Design
+
+The app works on both targets via a single conditional in `api/src/config/ssm.ts`:
+
+```typescript
+// loadProductionSecrets() — called on every production startup
+if (process.env.USE_SSM !== 'true') {
+  return; // Railway: use directly-injected env vars
+}
+// AWS: load secrets from SSM Parameter Store
+```
+
+In production mode, Express also serves the Vite build as static files (for Railway's single-service model). On AWS, CloudFront + S3 handles this instead.
+
+```typescript
+// api/src/app.ts — after all API routes
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(staticPath));
+  app.get('*', (_req, res) => res.sendFile('index.html'));
+}
+```
+
+This SPA fallback serves `index.html` for all non-API routes so React Router can handle client-side navigation. On AWS, a CloudFront Function does the same thing at the CDN edge.
 
 ## Testing Strategy
 
