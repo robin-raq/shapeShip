@@ -5,15 +5,13 @@
  * crash the Express server with no logging or recovery. These handlers
  * ensure errors are logged before the process exits.
  */
+import { logger } from './config/logger.js';
 
 export function handleUnhandledRejection(
   reason: unknown,
   _promise: Promise<unknown>
 ): void {
-  console.error(
-    '[FATAL] Unhandled Rejection:',
-    reason instanceof Error ? reason.stack || reason.message : reason
-  );
+  logger.fatal({ err: reason instanceof Error ? reason : new Error(String(reason)) }, 'Unhandled Rejection');
   // In production, allow the process to exit after logging
   // so the process manager (PM2, ECS, etc.) can restart it
   if (process.env.NODE_ENV === 'production') {
@@ -22,7 +20,7 @@ export function handleUnhandledRejection(
 }
 
 export function handleUncaughtException(err: Error): void {
-  console.error('[FATAL] Uncaught Exception:', err.stack || err.message);
+  logger.fatal({ err }, 'Uncaught Exception');
   // Always exit on uncaught exceptions — the process state is unknown
   process.exit(1);
 }

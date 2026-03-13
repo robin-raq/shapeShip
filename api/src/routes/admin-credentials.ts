@@ -7,6 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import type { Router as RouterType } from 'express';
+import { logger } from '../config/logger.js';
 import { authMiddleware, superAdminMiddleware } from '../middleware/auth.js';
 import { logAuditEvent } from '../services/audit.js';
 import {
@@ -499,9 +500,7 @@ router.post('/save', authMiddleware, superAdminMiddleware, async (req: Request, 
   };
 
   // Validate issuer discovery before saving (but save anyway with warning if it fails)
-  console.log('[AdminCredentials] Validating credentials before save...');
-  console.log(`[AdminCredentials]   Issuer URL: ${newCredentials.issuer_url}`);
-  console.log(`[AdminCredentials]   Client ID: ${newCredentials.client_id}`);
+  logger.info({ issuerUrl: newCredentials.issuer_url, clientId: newCredentials.client_id }, 'Validating credentials before save');
 
   let validationWarning: string | null = null;
   try {
@@ -510,22 +509,14 @@ router.post('/save', authMiddleware, superAdminMiddleware, async (req: Request, 
       newCredentials.client_id,
       newCredentials.client_secret
     );
-    console.log('[AdminCredentials] Validation passed, proceeding to save...');
+    logger.info('AdminCredentials validation passed, proceeding to save');
   } catch (err) {
     const error = err as Error & { cause?: unknown; code?: string };
     const errorMessage = error.message || 'Unknown error';
-    console.error('[AdminCredentials] Validation FAILED (will save anyway):');
-    console.error(`[AdminCredentials]   Message: ${errorMessage}`);
-    console.error(`[AdminCredentials]   Name: ${error.name}`);
-    if (error.code) {
-      console.error(`[AdminCredentials]   Code: ${error.code}`);
-    }
-    if (error.cause) {
-      console.error('[AdminCredentials]   Cause:', error.cause);
-    }
+    logger.error({ err: error, errorMessage, errorName: error.name, errorCode: error.code, errorCause: error.cause }, 'AdminCredentials validation failed (will save anyway)');
     // Store warning but continue with save
     validationWarning = `Issuer discovery failed: ${errorMessage}`;
-    console.log('[AdminCredentials] Proceeding to save despite validation failure...');
+    logger.info('AdminCredentials proceeding to save despite validation failure');
   }
 
   // Determine which fields changed for audit logging

@@ -3,6 +3,7 @@ import type { Router as RouterType } from 'express';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { ERROR_CODES, HTTP_STATUS, SESSION_TIMEOUT_MS } from '@ship/shared';
 import { logAuditEvent } from '../services/audit.js';
 import { linkUserToWorkspaceViaInvite } from '../services/invite-acceptance.js';
@@ -101,7 +102,7 @@ router.get('/:token', async (req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (error) {
-    console.error('Validate invite error:', error);
+    logger.error({ err: error }, 'Validate invite error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -266,7 +267,7 @@ router.post('/:token/accept', async (req: Request, res: Response): Promise<void>
       },
     });
   } catch (error) {
-    console.error('Accept invite error:', error);
+    logger.error({ err: error }, 'Accept invite error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {

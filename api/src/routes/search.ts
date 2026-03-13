@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { isWorkspaceAdmin } from '../middleware/visibility.js';
 
@@ -72,7 +73,7 @@ searchRouter.get('/mentions', authMiddleware, async (req: Request, res: Response
       documents: documentsResult.rows,
     });
   } catch (error) {
-    console.error('Error searching mentions:', error);
+    logger.error({ err: error }, 'Error searching mentions');
     res.status(500).json({ error: 'Failed to search mentions' });
   }
 });
@@ -155,7 +156,7 @@ searchRouter.get('/learnings', authMiddleware, async (req: Request, res: Respons
       total: result.rows.length,
     });
   } catch (error) {
-    console.error('Error searching learnings:', error);
+    logger.error({ err: error }, 'Error searching learnings');
     res.status(500).json({ error: 'Failed to search learnings' });
   }
 });

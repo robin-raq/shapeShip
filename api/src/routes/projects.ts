@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -411,7 +412,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
     const result = await pool.query(query, params);
     res.json(result.rows.map(extractProjectFromRow));
   } catch (err) {
-    console.error('List projects error:', err);
+    logger.error({ err }, 'List projects error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -509,7 +510,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(extractProjectFromRow(row));
   } catch (err) {
-    console.error('Get project error:', err);
+    logger.error({ err }, 'Get project error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -592,7 +593,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
       owner,
     });
   } catch (err) {
-    console.error('Create project error:', err);
+    logger.error({ err }, 'Create project error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -846,7 +847,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(extractProjectFromRow(result.rows[0]));
   } catch (err) {
-    console.error('Update project error:', err);
+    logger.error({ err }, 'Update project error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -888,7 +889,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     res.status(204).send();
   } catch (err) {
-    console.error('Delete project error:', err);
+    logger.error({ err }, 'Delete project error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -987,7 +988,7 @@ router.get('/:id/retro', authMiddleware, async (req: Request, res: Response) => 
       });
     }
   } catch (err) {
-    console.error('Get project retro error:', err);
+    logger.error({ err }, 'Get project retro error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1079,7 +1080,7 @@ router.post('/:id/retro', authMiddleware, async (req: Request, res: Response) =>
       content: result.rows[0].content || {},
     });
   } catch (err) {
-    console.error('Create project retro error:', err);
+    logger.error({ err }, 'Create project retro error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1195,7 +1196,7 @@ router.get('/:id/issues', authMiddleware, async (req: Request, res: Response) =>
 
     res.json(issues);
   } catch (err) {
-    console.error('Get project issues error:', err);
+    logger.error({ err }, 'Get project issues error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1255,7 +1256,7 @@ router.get('/:id/weeks', authMiddleware, async (req: Request, res: Response) => 
 
     res.json(result.rows.map(extractSprintFromRow));
   } catch (err) {
-    console.error('Get project weeks error:', err);
+    logger.error({ err }, 'Get project weeks error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1314,7 +1315,7 @@ router.get('/:id/sprints', authMiddleware, async (req: Request, res: Response) =
 
     res.json(result.rows.map(extractSprintFromRow));
   } catch (err) {
-    console.error('Get project sprints error:', err);
+    logger.error({ err }, 'Get project sprints error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1485,7 +1486,7 @@ router.post('/:id/sprints', authMiddleware, async (req: Request, res: Response) 
       confidence: properties.confidence ?? null,
     });
   } catch (err) {
-    console.error('Create project sprint error:', err);
+    logger.error({ err }, 'Create project sprint error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1599,7 +1600,7 @@ router.patch('/:id/retro', authMiddleware, async (req: Request, res: Response) =
       content: result.rows[0].content || {},
     });
   } catch (err) {
-    console.error('Update project retro error:', err);
+    logger.error({ err }, 'Update project retro error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1663,7 +1664,7 @@ router.post('/:id/approve-plan', authMiddleware, async (req: Request, res: Respo
       approval: newProps.plan_approval,
     });
   } catch (err) {
-    console.error('Approve project plan error:', err);
+    logger.error({ err }, 'Approve project plan error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1727,7 +1728,7 @@ router.post('/:id/approve-retro', authMiddleware, async (req: Request, res: Resp
       approval: newProps.retro_approval,
     });
   } catch (err) {
-    console.error('Approve project retro error:', err);
+    logger.error({ err }, 'Approve project retro error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

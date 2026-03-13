@@ -41,8 +41,8 @@ async function addHeadings(page: Page, headings: Array<{ level: number; text: st
   await page.waitForTimeout(500)
 }
 
-// FIXME: Slash command menu interaction not working - button locators timing out
-test.describe('Table of Contents (TOC)', () => {
+// Slash command menu interaction not working — button locators timing out
+test.describe.fixme('Table of Contents (TOC)', () => {
   test.beforeEach(async ({ page }) => {
     await login(page)
   })

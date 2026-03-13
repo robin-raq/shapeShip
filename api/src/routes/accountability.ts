@@ -6,6 +6,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { logger } from '../config/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { checkMissingAccountability } from '../services/accountability.js';
 
@@ -97,7 +98,7 @@ router.get('/action-items', authMiddleware, async (req: Request, res: Response) 
       has_due_today,
     });
   } catch (err) {
-    console.error('Get accountability action items error:', err);
+    logger.error({ err }, 'Get accountability action items error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

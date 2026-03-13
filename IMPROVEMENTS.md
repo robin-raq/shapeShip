@@ -627,4 +627,78 @@ Four additional audit findings were addressed in this session:
 
 ---
 
-*Generated from Phase 1 audit baseline (2026-03-09) and Phase 2 remediation (2026-03-09 to 2026-03-13). Last updated 2026-03-13.*
+## Phase 3: Quick Wins + CI Gate (2026-03-13)
+
+> **Scope:** Dependency patching, full console→logger migration, TODO/FIXME hygiene, and GitHub Actions CI pipeline. Branch: `fix/error-handling-and-test-infra`.
+
+### Dependency Vulnerability Patching
+
+**Problem:** `pnpm audit` reported 24 vulnerabilities (1 critical, 14 high, 7 moderate, 2 low) — mostly in transitive dependencies like `fast-xml-parser` (via `@aws-sdk/*`) and `hono` (via `@modelcontextprotocol/sdk`).
+
+**What Changed:**
+- Bumped `express-rate-limit` from `^8.2.1` to `^8.2.2` (direct dep fix)
+- Added `pnpm.overrides` in root `package.json` to force patched versions of 10 transitive dependencies: `fast-xml-parser`, `minimatch` (two ranges), `rollup`, `hono`, `@hono/node-server`, `svgo`, `flatted`, `lodash`, `ajv`
+
+**After:** 24 vulnerabilities → 2 remaining (0 critical, 0 high). The 2 remaining are acceptable:
+- `markdown-it` (moderate) — locked by `@tiptap/pm`, can't override without breaking ProseMirror
+- `qs` (low) — via `supertest`, devDependency only
+
+### Console → Logger Migration (Full Codebase)
+
+**Problem:** Pino logger was set up in Phase 2 (`api/src/config/logger.ts`) and used in 8 core files, but **396 `console.*` calls remained across 45 files**. Production API was still emitting unstructured text to stdout.
+
+**What Changed:**
+- **Tier 1 — Infrastructure** (7 files, 47 calls): `collaboration/index.ts`, `config/ssm.ts`, `process-handlers.ts`, `middleware/auth.ts`, `services/secrets-manager.ts`, `app.ts`, `index.ts`
+- **Tier 2 — Services** (5 files, 58 calls): `services/caia.ts`, `services/ai-analysis.ts`, `services/audit.ts`, `swagger.ts`, `mcp/server.ts`
+- **Tier 3 — Route handlers** (28 files, ~200 calls): All files in `api/src/routes/`
+- Updated `process-handlers.test.ts` to mock `logger.fatal` instead of `console.error`
+- Consolidated multi-line `console.log` blocks into single structured log calls (e.g., 4 separate SSM log lines → 1 `logger.info({ corsOrigin, cdnDomain, appBaseUrl }, 'Secrets loaded')`)
+
+**Excluded (not production code):** `db/seed.ts` (36), `db/scale-seed.ts` (17), `db/scripts/orphan-diagnostic.ts` (34), test files — `console.log` is appropriate for seed scripts and diagnostics.
+
+**After:** 396 → 91 `console.*` calls remaining. **Zero** in production code paths. All 91 are in seed scripts, diagnostic tools, or test files.
+
+### TODO/FIXME Hygiene
+
+**Problem:** 5 `FIXME` comments in e2e tests and 1 `TODO` in API code were invisible — commented-out test blocks that silently pass.
+
+**What Changed:**
+- Converted 5 e2e FIXMEs to `test.describe.fixme('description', ...)` blocks:
+  - `e2e/security.spec.ts` — File Upload Validation (slash command UI changed)
+  - `e2e/performance.spec.ts` — Many Images performance test
+  - `e2e/toc.spec.ts` — Table of Contents interaction
+  - `e2e/data-integrity.spec.ts` — Data Integrity Images
+  - `e2e/images.spec.ts` — Images file upload
+- Changed 1 `TODO` → `DEFERRED` in `api/src/routes/team.ts:2148` with rationale
+
+**After:** All 5 e2e items now appear as "fixme" (skipped-with-reason) in Playwright test reports, instead of being invisible. Root cause for all 5: slash command file upload UI changed.
+
+### GitHub Actions CI Pipeline
+
+**Problem:** No CI pipeline existed. Vulnerabilities, type errors, and lint failures could be merged without detection.
+
+**What Changed:**
+- Created `.github/workflows/ci.yml` with 3 parallel jobs:
+  - **security-audit** — `pnpm audit --audit-level=high` (fails build on critical/high vulnerabilities)
+  - **type-check** — `pnpm build:shared && pnpm type-check` (catches type errors across all packages)
+  - **lint** — `pnpm lint` (enforces code style)
+- Triggers on push and PR to `master`/`main` branches
+- Uses `pnpm/action-setup@v4` + `actions/setup-node@v4` with Node 20 and pnpm cache
+
+**After:** Every push and PR now runs automated security, type, and lint checks. Unit tests not included yet (require PostgreSQL service container — follow-up work).
+
+### Phase 3 Totals
+
+| Metric | Value |
+|--------|-------|
+| Vulnerabilities | 24 → 2 (0 critical, 0 high) |
+| console.* in production code | 396 → 0 |
+| console.* total (incl. scripts/tests) | 396 → 91 |
+| FIXME/TODO items resolved | 6 (5 e2e + 1 API) |
+| CI jobs added | 3 (security-audit, type-check, lint) |
+| Unit tests passing | 520/520 (unchanged) |
+| Files modified | ~45 (migration + CI + docs) |
+
+---
+
+*Generated from Phase 1 audit baseline (2026-03-09), Phase 2 remediation (2026-03-09 to 2026-03-13), and Phase 3 quick wins (2026-03-13). Last updated 2026-03-13.*

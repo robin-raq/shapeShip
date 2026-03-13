@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
 import type { FeedbackQueryRow } from '../types/db-rows.js';
@@ -113,7 +114,7 @@ publicFeedbackRouter.post('/', async (req: Request, res: Response) => {
 
     res.status(201).json({ ...extractFeedbackFromRow(result.rows[0], programPrefix), program_id });
   } catch (err) {
-    console.error('Create feedback error:', err);
+    logger.error({ err }, 'Create feedback error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -143,7 +144,7 @@ publicFeedbackRouter.get('/program/:programId', async (req: Request, res: Respon
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Get program for feedback error:', err);
+    logger.error({ err }, 'Get program for feedback error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -183,7 +184,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(extractFeedbackFromRow(result.rows[0]));
   } catch (err) {
-    console.error('Get feedback error:', err);
+    logger.error({ err }, 'Get feedback error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

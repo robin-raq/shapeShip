@@ -1,5 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
 
+// Mock the logger module before importing process-handlers
+vi.mock('../config/logger.js', () => ({
+  logger: {
+    fatal: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
 /**
  * Tests for process-level error handlers.
  *
@@ -31,33 +42,27 @@ describe('Process Error Handlers', () => {
   });
 
   it('logs unhandled rejections with error details', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
+    const { logger } = await import('../config/logger.js');
     const { handleUnhandledRejection } = await import('../process-handlers.js');
 
     const testError = new Error('test rejection');
     handleUnhandledRejection(testError, Promise.reject(testError).catch(() => {}));
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Unhandled Rejection'),
-      expect.anything()
+    expect(logger.fatal).toHaveBeenCalledWith(
+      expect.objectContaining({ err: testError }),
+      'Unhandled Rejection'
     );
-
-    consoleSpy.mockRestore();
   });
 
   it('logs unhandled rejections for non-Error reasons', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
+    const { logger } = await import('../config/logger.js');
     const { handleUnhandledRejection } = await import('../process-handlers.js');
 
     handleUnhandledRejection('string reason', Promise.resolve());
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Unhandled Rejection'),
-      'string reason'
+    expect(logger.fatal).toHaveBeenCalledWith(
+      expect.objectContaining({ err: expect.any(Error) }),
+      'Unhandled Rejection'
     );
-
-    consoleSpy.mockRestore();
   });
 });

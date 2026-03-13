@@ -3,6 +3,7 @@ import type { Router as RouterType } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { ERROR_CODES, HTTP_STATUS, SESSION_TIMEOUT_MS, ABSOLUTE_SESSION_TIMEOUT_MS } from '@ship/shared';
 import { logAuditEvent } from '../services/audit.js';
@@ -213,7 +214,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error({ err: error }, 'Login error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -247,7 +248,7 @@ router.post('/logout', authMiddleware, async (req: Request, res: Response): Prom
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Logout error:', error);
+    logger.error({ err: error }, 'Logout error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -330,7 +331,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response): Promise<v
       },
     });
   } catch (error) {
-    console.error('Get me error:', error);
+    logger.error({ err: error }, 'Get me error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -377,7 +378,7 @@ router.post('/extend-session', authMiddleware, async (req: Request, res: Respons
       },
     });
   } catch (error) {
-    console.error('Extend session error:', error);
+    logger.error({ err: error }, 'Extend session error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -423,7 +424,7 @@ router.get('/session', authMiddleware, async (req: Request, res: Response): Prom
       },
     });
   } catch (error) {
-    console.error('Get session error:', error);
+    logger.error({ err: error }, 'Get session error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {

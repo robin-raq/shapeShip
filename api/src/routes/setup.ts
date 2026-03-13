@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import type { Router as RouterType } from 'express';
 import bcrypt from 'bcryptjs';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { ERROR_CODES, HTTP_STATUS } from '@ship/shared';
 import { WELCOME_DOCUMENT_TITLE, WELCOME_DOCUMENT_CONTENT } from '../db/welcomeDocument.js';
 
@@ -20,7 +21,7 @@ router.get('/status', async (_req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (error) {
-    console.error('Setup status error:', error);
+    logger.error({ err: error }, 'Setup status error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -116,7 +117,7 @@ router.post('/initialize', async (req: Request, res: Response): Promise<void> =>
       [workspaceId, WELCOME_DOCUMENT_TITLE, JSON.stringify(WELCOME_DOCUMENT_CONTENT), user.id]
     );
 
-    console.log(`Initial setup complete: ${email} is now super admin`);
+    logger.info({ email }, 'Initial setup complete: user is now super admin');
 
     res.status(HTTP_STATUS.CREATED).json({
       success: true,
@@ -131,7 +132,7 @@ router.post('/initialize', async (req: Request, res: Response): Promise<void> =>
       },
     });
   } catch (error) {
-    console.error('Setup initialization error:', error);
+    logger.error({ err: error }, 'Setup initialization error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {

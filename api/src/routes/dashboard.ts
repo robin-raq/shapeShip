@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { computeICEScore } from '@ship/shared';
@@ -260,7 +261,7 @@ router.get('/my-work', authMiddleware, async (req: Request, res: Response) => {
       days_remaining: daysRemaining,
     });
   } catch (err) {
-    console.error('Get my work error:', err);
+    logger.error({ err }, 'Get my work error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -480,7 +481,7 @@ router.get('/my-focus', authMiddleware, async (req: Request, res: Response) => {
       projects,
     });
   } catch (err) {
-    console.error('Get my focus error:', err);
+    logger.error({ err }, 'Get my focus error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -723,7 +724,7 @@ router.get('/my-week', authMiddleware, async (req: Request, res: Response) => {
       projects,
     });
   } catch (err) {
-    console.error('Get my-week error:', err);
+    logger.error({ err }, 'Get my-week error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

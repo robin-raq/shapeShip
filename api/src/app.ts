@@ -252,7 +252,7 @@ export function createApp(corsOrigin: string = 'http://localhost:5173'): express
 
   // Initialize CAIA OAuth client at startup
   initializeCAIA().catch((err) => {
-    console.warn('CAIA initialization failed:', err);
+    logger.warn({ err }, 'CAIA initialization failed');
   });
 
   // --- Error handling (MUST be after all routes) ---

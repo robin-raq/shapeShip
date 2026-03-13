@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import type { Router as RouterType } from 'express';
 import crypto from 'crypto';
+import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { pool } from '../db/client.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -101,7 +102,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
       },
     });
   } catch (error) {
-    console.error('Create API token error:', error);
+    logger.error({ err: error }, 'Create API token error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -137,7 +138,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response): Promise<voi
       })),
     });
   } catch (error) {
-    console.error('List API tokens error:', error);
+    logger.error({ err: error }, 'List API tokens error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -192,7 +193,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response): Promi
       data: { message: 'API token revoked' },
     });
   } catch (error) {
-    console.error('Revoke API token error:', error);
+    logger.error({ err: error }, 'Revoke API token error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {

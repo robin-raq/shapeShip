@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
 import { isWorkspaceAdmin } from '../middleware/visibility.js';
@@ -155,7 +156,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(documents);
   } catch (err) {
-    console.error('List documents error:', err);
+    logger.error({ err }, 'List documents error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -219,7 +220,7 @@ router.get('/converted/list', authMiddleware, async (req: Request, res: Response
 
     res.json(conversions);
   } catch (err) {
-    console.error('List converted documents error:', err);
+    logger.error({ err }, 'List converted documents error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -369,7 +370,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
       ...((doc.document_type === 'issue' || doc.document_type === 'wiki' || doc.document_type === 'sprint' || doc.document_type === 'project') && { belongs_to }),
     });
   } catch (err) {
-    console.error('Get document error:', err);
+    logger.error({ err }, 'Get document error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -424,7 +425,7 @@ router.get('/:id/content', authMiddleware, async (req: Request, res: Response) =
       content: content || { type: 'doc', content: [] },
     });
   } catch (err) {
-    console.error('Get document content error:', err);
+    logger.error({ err }, 'Get document content error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -503,7 +504,7 @@ router.patch('/:id/content', authMiddleware, async (req: Request, res: Response)
       content: result.rows[0].content,
     });
   } catch (err) {
-    console.error('Update document content error:', err);
+    logger.error({ err }, 'Update document content error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -590,7 +591,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
     res.status(201).json(newDoc);
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('Create document error:', err);
+    logger.error({ err }, 'Create document error');
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
@@ -1034,7 +1035,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
     // Notify WebSocket collaboration server to disconnect users who lost access
     if (data.visibility !== undefined && data.visibility !== existing.visibility) {
       handleVisibilityChange(id, data.visibility, existing.created_by).catch((err) => {
-        console.error('Failed to handle visibility change for collaboration:', err);
+        logger.error({ err }, 'Failed to handle visibility change for collaboration');
       });
     }
 
@@ -1098,7 +1099,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
     });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
-    console.error('Update document error:', err);
+    logger.error({ err }, 'Update document error');
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
@@ -1137,7 +1138,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     res.status(204).send();
   } catch (err) {
-    console.error('Delete document error:', err);
+    logger.error({ err }, 'Delete document error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1342,7 +1343,7 @@ router.post('/:id/convert', authMiddleware, async (req: Request, res: Response) 
 
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('Convert document error:', err);
+    logger.error({ err }, 'Convert document error');
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
@@ -1509,7 +1510,7 @@ router.post('/:id/undo-conversion', authMiddleware, async (req: Request, res: Re
 
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('Undo conversion error:', err);
+    logger.error({ err }, 'Undo conversion error');
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();

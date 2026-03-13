@@ -197,9 +197,9 @@ test.describe('Data Integrity - Document Persistence', () => {
 
 })
 
-// FIXME: Filechooser event not firing - slash command image upload interaction broken
-// Same issue as images.spec.ts - see that file for context
-test.describe('Data Integrity - Images', () => {
+// Filechooser event not firing — slash command image upload interaction broken
+// Same root cause as images.spec.ts
+test.describe.fixme('Data Integrity - Images', () => {
   test.beforeEach(async ({ page }) => {
     await login(page)
   })

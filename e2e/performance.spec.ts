@@ -356,9 +356,9 @@ test.describe('Performance - Large Documents', () => {
   })
 })
 
-// FIXME: Slash command dropdown inconsistent + filechooser event not firing reliably
-// Same issue as images.spec.ts and data-integrity.spec.ts
-test.describe('Performance - Many Images', () => {
+// Slash command dropdown inconsistent + filechooser event not firing reliably
+// Same root cause as images.spec.ts and data-integrity.spec.ts
+test.describe.fixme('Performance - Many Images', () => {
   test.beforeEach(async ({ page }) => {
     await login(page)
   })

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { TEMPLATE_HEADINGS, extractText, hasContent } from '../utils/document-content.js';
@@ -190,7 +191,7 @@ router.get('/grid', authMiddleware, async (req: Request, res: Response) => {
       currentSprintNumber,
     });
   } catch (err) {
-    console.error('Get team grid error:', err);
+    logger.error({ err }, 'Get team grid error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -229,7 +230,7 @@ router.get('/projects', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(result.rows);
   } catch (err) {
-    console.error('Get projects error:', err);
+    logger.error({ err }, 'Get projects error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -254,7 +255,7 @@ router.get('/programs', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(result.rows);
   } catch (err) {
-    console.error('Get programs error:', err);
+    logger.error({ err }, 'Get programs error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -451,7 +452,7 @@ router.get('/assignments', authMiddleware, async (req: Request, res: Response) =
 
     res.json(assignments);
   } catch (err) {
-    console.error('Get assignments error:', err);
+    logger.error({ err }, 'Get assignments error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -636,7 +637,7 @@ router.post('/assign', authMiddleware, async (req: Request, res: Response) => {
 
     res.json({ success: true, sprintId });
   } catch (err) {
-    console.error('Assign error:', err);
+    logger.error({ err }, 'Assign error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -721,7 +722,7 @@ router.delete('/assign', authMiddleware, async (req: Request, res: Response) => 
 
     res.json({ success: true });
   } catch (err) {
-    console.error('Unassign error:', err);
+    logger.error({ err }, 'Unassign error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -761,7 +762,7 @@ router.get('/people', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(result.rows);
   } catch (err) {
-    console.error('Get people error:', err);
+    logger.error({ err }, 'Get people error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -931,7 +932,7 @@ router.get('/accountability', authMiddleware, async (req: Request, res: Response
       patternAlerts,
     });
   } catch (err) {
-    console.error('Get accountability error:', err);
+    logger.error({ err }, 'Get accountability error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1063,7 +1064,7 @@ router.get('/people/:personId/sprint-metrics', authMiddleware, async (req: Reque
       averageRate,
     });
   } catch (err) {
-    console.error('Get person sprint metrics error:', err);
+    logger.error({ err }, 'Get person sprint metrics error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1351,7 +1352,7 @@ router.get('/accountability-grid-v2', authMiddleware, async (req: Request, res: 
       currentSprintNumber,
     });
   } catch (err) {
-    console.error('Get accountability grid v2 error:', err);
+    logger.error({ err }, 'Get accountability grid v2 error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1596,7 +1597,7 @@ router.get('/reviews', authMiddleware, async (req: Request, res: Response) => {
       currentSprintNumber,
     });
   } catch (err) {
-    console.error('Get team reviews error:', err);
+    logger.error({ err }, 'Get team reviews error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1998,7 +1999,7 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
       currentSprintNumber,
     });
   } catch (err) {
-    console.error('Get accountability grid v3 error:', err);
+    logger.error({ err }, 'Get accountability grid v3 error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -2144,9 +2145,9 @@ router.get('/accountability-grid', authMiddleware, async (req: Request, res: Res
       [workspaceId]
     );
 
-    // Sprint allocations feature not yet implemented in unified document model
-    // TODO: Derive allocations from issue assignments (issues assigned to both project and sprint)
-    // For now, return empty allocations so the endpoint works
+    // DEFERRED: Sprint allocations not yet implemented in unified document model.
+    // Would derive allocations from issue assignments (issues assigned to both project and sprint).
+    // For now, return empty allocations so the endpoint works.
     const projectAllocations: Record<string, Record<number, number>> = {};
 
     // Build projects array with accountability data
@@ -2187,7 +2188,7 @@ router.get('/accountability-grid', authMiddleware, async (req: Request, res: Res
       projects,
     });
   } catch (err) {
-    console.error('Get accountability grid error:', err);
+    logger.error({ err }, 'Get accountability grid error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

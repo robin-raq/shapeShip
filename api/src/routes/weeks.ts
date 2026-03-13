@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -178,7 +179,7 @@ router.get('/lookup-person', authMiddleware, async (req: Request, res: Response)
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Person lookup error:', err);
+    logger.error({ err }, 'Person lookup error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -214,7 +215,7 @@ router.get('/lookup', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error('Sprint lookup error:', err);
+    logger.error({ err }, 'Sprint lookup error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -460,7 +461,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       sprint_end_date: currentSprintEnd.toISOString().split('T')[0],
     });
   } catch (err) {
-    console.error('Get active sprints error:', err);
+    logger.error({ err }, 'Get active sprints error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -628,7 +629,7 @@ router.get('/my-action-items', authMiddleware, async (req: Request, res: Respons
 
     res.json({ action_items: actionItems });
   } catch (err) {
-    console.error('Get my action items error:', err);
+    logger.error({ err }, 'Get my action items error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -822,7 +823,7 @@ router.get('/my-week', authMiddleware, async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    console.error('Get my-week error:', err);
+    logger.error({ err }, 'Get my-week error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -933,7 +934,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(extractSprintFromRow(row));
   } catch (err) {
-    console.error('Get sprint error:', err);
+    logger.error({ err }, 'Get sprint error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1123,7 +1124,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
       plan_history: properties.plan_history || null,
     });
   } catch (err) {
-    console.error('Create sprint error:', err);
+    logger.error({ err }, 'Create sprint error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1272,7 +1273,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(extractSprintFromRow(row!));
   } catch (err) {
-    console.error('Update sprint error:', err);
+    logger.error({ err }, 'Update sprint error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1346,7 +1347,7 @@ router.post('/:id/start', authMiddleware, async (req: Request, res: Response) =>
       snapshot_issue_count: plannedIssueIds.length,
     });
   } catch (err) {
-    console.error('Start sprint error:', err);
+    logger.error({ err }, 'Start sprint error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1387,7 +1388,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     res.status(204).send();
   } catch (err) {
-    console.error('Delete sprint error:', err);
+    logger.error({ err }, 'Delete sprint error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1516,7 +1517,7 @@ router.patch('/:id/plan', authMiddleware, async (req: Request, res: Response) =>
 
     res.json(extractSprintFromRow(row!));
   } catch (err) {
-    console.error('Update sprint plan error:', err);
+    logger.error({ err }, 'Update sprint plan error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1614,7 +1615,7 @@ router.get('/:id/issues', authMiddleware, async (req: Request, res: Response) =>
 
     res.json(issues);
   } catch (err) {
-    console.error('Get sprint issues error:', err);
+    logger.error({ err }, 'Get sprint issues error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1787,7 +1788,7 @@ router.get('/:id/scope-changes', authMiddleware, async (req: Request, res: Respo
       scopeChanges,
     });
   } catch (err) {
-    console.error('Get sprint scope changes error:', err);
+    logger.error({ err }, 'Get sprint scope changes error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1896,7 +1897,7 @@ router.get('/:id/standups', authMiddleware, async (req: Request, res: Response) 
 
     res.json(standups);
   } catch (err) {
-    console.error('Get sprint standups error:', err);
+    logger.error({ err }, 'Get sprint standups error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -2017,7 +2018,7 @@ router.post('/:id/standups', authMiddleware, async (req: Request, res: Response)
       updated_at: standup.updated_at,
     });
   } catch (err) {
-    console.error('Create standup error:', err);
+    logger.error({ err }, 'Create standup error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -2277,7 +2278,7 @@ router.get('/:id/review', authMiddleware, async (req: Request, res: Response) =>
       is_draft: true,
     });
   } catch (err) {
-    console.error('Get sprint review error:', err);
+    logger.error({ err }, 'Get sprint review error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -2390,7 +2391,7 @@ router.post('/:id/review', authMiddleware, async (req: Request, res: Response) =
       is_draft: false,
     });
   } catch (err) {
-    console.error('Create sprint review error:', err);
+    logger.error({ err }, 'Create sprint review error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -2551,7 +2552,7 @@ router.patch('/:id/review', authMiddleware, async (req: Request, res: Response) 
       is_draft: false,
     });
   } catch (err) {
-    console.error('Update sprint review error:', err);
+    logger.error({ err }, 'Update sprint review error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -2690,7 +2691,7 @@ router.post('/:id/carryover', authMiddleware, async (req: Request, res: Response
       },
     });
   } catch (err) {
-    console.error('Week carryover error:', err);
+    logger.error({ err }, 'Week carryover error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -2790,7 +2791,7 @@ router.post('/:id/approve-plan', authMiddleware, async (req: Request, res: Respo
       approval: newApproval,
     });
   } catch (err) {
-    console.error('Approve sprint plan error:', err);
+    logger.error({ err }, 'Approve sprint plan error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -2849,7 +2850,7 @@ router.post('/:id/unapprove-plan', authMiddleware, async (req: Request, res: Res
 
     res.json({ success: true });
   } catch (err) {
-    console.error('Unapprove sprint plan error:', err);
+    logger.error({ err }, 'Unapprove sprint plan error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -2978,7 +2979,7 @@ router.post('/:id/approve-review', authMiddleware, async (req: Request, res: Res
       review_rating: newProps.review_rating,
     });
   } catch (err) {
-    console.error('Approve sprint review error:', err);
+    logger.error({ err }, 'Approve sprint review error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -3071,7 +3072,7 @@ router.post('/:id/request-plan-changes', authMiddleware, async (req: Request, re
       approval: newProps.plan_approval,
     });
   } catch (err) {
-    console.error('Request plan changes error:', err);
+    logger.error({ err }, 'Request plan changes error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -3163,7 +3164,7 @@ router.post('/:id/request-retro-changes', authMiddleware, async (req: Request, r
       approval: newProps.review_approval,
     });
   } catch (err) {
-    console.error('Request retro changes error:', err);
+    logger.error({ err }, 'Request retro changes error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

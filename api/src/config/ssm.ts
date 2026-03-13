@@ -11,6 +11,7 @@
  *   - CAIA OAuth credentials (CAIA_ISSUER_URL, CAIA_CLIENT_ID, etc.)
  */
 import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
+import { logger } from './logger.js';
 
 // Lazy-initialized client to avoid keeping Node.js alive during import tests
 let _client: SSMClient | null = null;
@@ -41,14 +42,14 @@ export async function loadProductionSecrets(): Promise<void> {
   }
 
   if (process.env.USE_SSM !== 'true') {
-    console.log('USE_SSM not set — using directly-injected environment variables');
+    logger.info('USE_SSM not set — using directly-injected environment variables');
     return; // Non-AWS platforms (Railway, etc.) inject env vars directly
   }
 
   const environment = process.env.ENVIRONMENT || 'prod';
   const basePath = `/ship/${environment}`;
 
-  console.log(`Loading secrets from SSM path: ${basePath}`);
+  logger.info({ basePath }, 'Loading secrets from SSM');
 
   const [databaseUrl, sessionSecret, corsOrigin, cdnDomain, appBaseUrl] = await Promise.all([
     getSSMSecret(`${basePath}/DATABASE_URL`),
@@ -64,8 +65,5 @@ export async function loadProductionSecrets(): Promise<void> {
   process.env.CDN_DOMAIN = cdnDomain;
   process.env.APP_BASE_URL = appBaseUrl;
 
-  console.log('Secrets loaded from SSM Parameter Store');
-  console.log(`CORS_ORIGIN: ${corsOrigin}`);
-  console.log(`CDN_DOMAIN: ${cdnDomain}`);
-  console.log(`APP_BASE_URL: ${appBaseUrl}`);
+  logger.info({ corsOrigin, cdnDomain, appBaseUrl }, 'Secrets loaded from SSM Parameter Store');
 }

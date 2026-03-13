@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -95,7 +96,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
     const result = await pool.query(query, params);
     res.json(result.rows.map(extractProgramFromRow));
   } catch (err) {
-    console.error('List programs error:', err);
+    logger.error({ err }, 'List programs error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -135,7 +136,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(extractProgramFromRow(result.rows[0]));
   } catch (err) {
-    console.error('Get program error:', err);
+    logger.error({ err }, 'Get program error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -188,7 +189,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
       } : null
     });
   } catch (err) {
-    console.error('Create program error:', err);
+    logger.error({ err }, 'Create program error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -306,7 +307,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(extractProgramFromRow(result.rows[0]));
   } catch (err) {
-    console.error('Update program error:', err);
+    logger.error({ err }, 'Update program error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -348,7 +349,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     res.status(204).send();
   } catch (err) {
-    console.error('Delete program error:', err);
+    logger.error({ err }, 'Delete program error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -427,7 +428,7 @@ router.get('/:id/issues', authMiddleware, async (req: Request, res: Response) =>
 
     res.json(issues);
   } catch (err) {
-    console.error('Get program issues error:', err);
+    logger.error({ err }, 'Get program issues error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -509,7 +510,7 @@ router.get('/:id/projects', authMiddleware, async (req: Request, res: Response) 
 
     res.json(projects);
   } catch (err) {
-    console.error('Get program projects error:', err);
+    logger.error({ err }, 'Get program projects error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -603,7 +604,7 @@ router.get('/:id/sprints', authMiddleware, async (req: Request, res: Response) =
       weeks: sprints,
     });
   } catch (err) {
-    console.error('Get program sprints error:', err);
+    logger.error({ err }, 'Get program sprints error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -705,7 +706,7 @@ router.get('/:id/merge-preview', authMiddleware, async (req: Request, res: Respo
       conflicts,
     });
   } catch (err) {
-    console.error('Merge preview error:', err);
+    logger.error({ err }, 'Merge preview error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -883,7 +884,7 @@ router.post('/:id/merge', authMiddleware, async (req: Request, res: Response) =>
     res.json(extractProgramFromRow(result.rows[0]));
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('Merge program error:', err);
+    logger.error({ err }, 'Merge program error');
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
