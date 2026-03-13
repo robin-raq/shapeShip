@@ -13,6 +13,7 @@
 import { Router, Request, Response } from 'express';
 import type { Router as RouterType } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import {
   isCAIAConfigured,
   getAuthorizationUrl,
@@ -80,7 +81,7 @@ router.get('/login', async (req: Request, res: Response): Promise<void> => {
       data: { authorizationUrl: url },
     });
   } catch (error) {
-    console.error('CAIA login initiation error:', error);
+    logger.error({ err: error }, 'CAIA login initiation error');
     res.status(500).json({
       success: false,
       error: { code: 'CAIA_INIT_ERROR', message: 'Failed to initiate CAIA login' },
@@ -94,7 +95,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
 
   // Handle OAuth errors from the authorization server
   if (error) {
-    console.error('CAIA OAuth error:', error, error_description);
+    logger.error({ error, error_description }, 'CAIA OAuth error');
     await logAuditEvent({
       action: 'auth.caia_login_failed',
       details: { reason: 'oauth_error', error: String(error), errorDescription: String(error_description || '') },
@@ -106,7 +107,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
 
   // Validate and consume state from database (one-time use)
   if (!state || typeof state !== 'string') {
-    console.error('CAIA callback: Missing state parameter');
+    logger.error('CAIA callback: Missing state parameter');
     await logAuditEvent({
       action: 'auth.caia_login_failed',
       details: { reason: 'missing_state_param' },
@@ -118,7 +119,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
 
   const oauthState = await consumeOAuthState(state);
   if (!oauthState) {
-    console.error('CAIA state not found or expired:', { state });
+    logger.error({ state }, 'CAIA state not found or expired');
     await logAuditEvent({
       action: 'auth.caia_login_failed',
       details: { reason: 'invalid_or_expired_state' },
@@ -142,7 +143,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
     const name = buildNameFromClaims(userInfo.givenName, userInfo.familyName, email);
 
     if (!email) {
-      console.error('CAIA callback: No email in userInfo', userInfo);
+      logger.error({ userInfo }, 'CAIA callback: No email in userInfo');
       await logAuditEvent({
         action: 'auth.caia_login_failed',
         details: { reason: 'no_email_in_token' },
@@ -154,7 +155,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
 
     // Validate email format (SEC-01: Basic regex check for .gov/.mil addresses)
     if (!isValidEmail(email)) {
-      console.error('CAIA callback: Invalid email format', { email });
+      logger.error({ email }, 'CAIA callback: Invalid email format');
       await logAuditEvent({
         action: 'auth.caia_login_failed',
         details: { reason: 'invalid_email_format', email },
@@ -173,7 +174,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
       if (!invite) {
         // No invite = no access (CAIA users must be pre-invited)
         // Use generic message to avoid revealing invite system details (Issue #349)
-        console.log(`CAIA login rejected: No invite found for ${email}`);
+        logger.info({ email }, 'CAIA login rejected: No invite found');
         await logAuditEvent({
           action: 'auth.caia_login_failed',
           details: { reason: 'no_invite', email },
@@ -204,7 +205,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
         const { isNewMembership } = await linkUserToWorkspaceViaInvite(user, invite);
 
         if (isNewMembership) {
-          console.log(`CAIA login: Added existing user ${email} to workspace ${invite.workspace_name} via pending invite`);
+          logger.info({ email, workspaceName: invite.workspace_name }, 'CAIA login: Added existing user to workspace via pending invite');
 
           await logAuditEvent({
             workspaceId: invite.workspace_id,
@@ -254,7 +255,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
 
     // Super-admins can log in without workspace membership
     if (!workspaceId && !user.is_super_admin && workspaces.length === 0) {
-      console.log(`CAIA user ${email} has no workspace access`);
+      logger.info({ email }, 'CAIA user has no workspace access');
       await logAuditEvent({
         actorUserId: user.id,
         action: 'auth.caia_login_failed',
@@ -320,7 +321,7 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
     res.redirect(redirectUrl);
 
   } catch (error) {
-    console.error('CAIA callback error:', error);
+    logger.error({ err: error }, 'CAIA callback error');
 
     // Extract specific error message for user feedback
     let errorMessage = 'Authentication failed';
@@ -469,7 +470,7 @@ async function createUserFromInvite(
   // Use shared service for membership + person doc + invite marking
   await linkUserToWorkspaceViaInvite(user, invite);
 
-  console.log(`Created CAIA user from invite: ${email} -> workspace ${invite.workspace_name}`);
+  logger.info({ email, workspaceName: invite.workspace_name }, 'Created CAIA user from invite');
   return user;
 }
 

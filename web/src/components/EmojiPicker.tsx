@@ -1,6 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
-import EmojiPicker, { Theme, EmojiClickData } from 'emoji-picker-react';
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { cn } from '@/lib/cn';
+
+// Lazy-load the heavy emoji-picker-react library (~300KB)
+// Only loaded when user opens the picker
+const LazyEmojiPicker = lazy(() =>
+  import('emoji-picker-react').then(mod => ({ default: mod.default }))
+);
 
 interface EmojiPickerPopoverProps {
   value?: string | null;
@@ -41,7 +46,7 @@ export function EmojiPickerPopover({ value, onChange, children, className }: Emo
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen]);
 
-  const handleEmojiClick = (emojiData: EmojiClickData) => {
+  const handleEmojiClick = (emojiData: { emoji: string }) => {
     onChange(emojiData.emoji);
     setIsOpen(false);
   };
@@ -73,15 +78,17 @@ export function EmojiPickerPopover({ value, onChange, children, className }: Emo
                 Remove emoji
               </button>
             )}
-            <EmojiPicker
-              onEmojiClick={handleEmojiClick}
-              skinTonesDisabled={true}
-              theme={Theme.DARK}
-              height={350}
-              width={300}
-              searchPlaceholder="Search emoji..."
-              previewConfig={{ showPreview: false }}
-            />
+            <Suspense fallback={<div className="w-[300px] h-[350px] flex items-center justify-center text-muted text-sm">Loading...</div>}>
+              <LazyEmojiPicker
+                onEmojiClick={handleEmojiClick}
+                skinTonesDisabled={true}
+                theme={"dark" as any}
+                height={350}
+                width={300}
+                searchPlaceholder="Search emoji..."
+                previewConfig={{ showPreview: false }}
+              />
+            </Suspense>
           </div>
         </div>
       )}

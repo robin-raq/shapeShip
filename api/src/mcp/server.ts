@@ -20,6 +20,7 @@ import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { readFileSync, existsSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
+import { logger } from "../config/logger.js";
 
 // ============== Configuration ==============
 
@@ -127,7 +128,7 @@ let CONFIG: Config;
  */
 async function fetchOpenAPISpec(url: string): Promise<OpenAPIObject> {
   const specUrl = `${url}/api/openapi.json`;
-  console.error(`Fetching OpenAPI spec from ${specUrl}...`);
+  logger.info({ specUrl }, 'Fetching OpenAPI spec');
 
   const response = await fetch(specUrl);
   if (!response.ok) {
@@ -422,14 +423,14 @@ async function executeToolCall(
     fetchOptions.body = JSON.stringify(bodyParams);
   }
 
-  console.error(`[MCP] ${method.toUpperCase()} ${url}`);
+  logger.info({ method: method.toUpperCase(), url }, 'MCP executing API call');
 
   const response = await fetch(url, fetchOptions);
 
   // Handle non-OK responses before trying to parse JSON
   if (!response.ok) {
     const text = await response.text();
-    console.error(`[MCP] Error ${response.status}: ${text.substring(0, 200)}`);
+    logger.error({ status: response.status, body: text.substring(0, 200) }, 'MCP API call error');
 
     // Try to parse as JSON for structured error, fall back to text
     let errorMessage: string;
@@ -457,7 +458,7 @@ async function main() {
 
   // Generate tools from spec
   const mcpTools = generateTools(openApiSpec);
-  console.error(`Generated ${mcpTools.length} tools from OpenAPI spec`);
+  logger.info({ toolCount: mcpTools.length }, 'Generated MCP tools from OpenAPI spec');
 
   // Create the MCP server
   const server = new Server(
@@ -515,10 +516,10 @@ async function main() {
   // Connect transport and start
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`Ship MCP server running on ${CONFIG.url}`);
+  logger.info({ url: CONFIG.url }, 'Ship MCP server running');
 }
 
 main().catch((error) => {
-  console.error("Failed to start Ship MCP server:", error);
+  logger.error({ err: error }, 'Failed to start Ship MCP server');
   process.exit(1);
 });

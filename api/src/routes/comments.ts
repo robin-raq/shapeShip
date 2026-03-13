@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
 import { z } from 'zod';
+import { logger } from '../config/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 type RouterType = ReturnType<typeof Router>;
@@ -48,7 +49,7 @@ documentCommentsRouter.get('/:id/comments', authMiddleware, async (req: Request,
 
     res.json(comments);
   } catch (err) {
-    console.error('List comments error:', err);
+    logger.error({ err }, 'List comments error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -122,7 +123,7 @@ documentCommentsRouter.post('/:id/comments', authMiddleware, async (req: Request
       updated_at: comment.updated_at,
     });
   } catch (err) {
-    console.error('Create comment error:', err);
+    logger.error({ err }, 'Create comment error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -218,7 +219,7 @@ commentsRouter.patch('/:id', authMiddleware, async (req: Request, res: Response)
       updated_at: comment.updated_at,
     });
   } catch (err) {
-    console.error('Update comment error:', err);
+    logger.error({ err }, 'Update comment error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -242,7 +243,7 @@ commentsRouter.delete('/:id', authMiddleware, async (req: Request, res: Response
 
     res.json({ success: true });
   } catch (err) {
-    console.error('Delete comment error:', err);
+    logger.error({ err }, 'Delete comment error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

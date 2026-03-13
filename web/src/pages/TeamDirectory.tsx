@@ -134,10 +134,10 @@ export function TeamDirectoryPage() {
           <table className="w-full">
             <thead className="sticky top-0 bg-background border-b border-border">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">
                   Name
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted">
                   Email
                 </th>
               </tr>

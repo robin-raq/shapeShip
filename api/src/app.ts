@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { csrfSync } from 'csrf-sync';
 import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth.js';
@@ -35,6 +37,10 @@ import weeklyPlansRoutes, { weeklyRetrosRouter } from './routes/weekly-plans.js'
 import { documentCommentsRouter, commentsRouter } from './routes/comments.js';
 import { setupSwagger } from './swagger.js';
 import { initializeCAIA } from './services/caia.js';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { logger } from './config/logger.js';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 
 // Validate SESSION_SECRET in production
 if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
@@ -78,9 +84,12 @@ const loginLimiter = rateLimit({
 });
 
 // General API rate limit (100 req/min in prod, 1000 in dev)
+const apiRateMax = process.env.RATE_LIMIT_MAX
+  ? parseInt(process.env.RATE_LIMIT_MAX, 10)
+  : isTestEnv ? 10000 : isDevEnv ? 1000 : 100;
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: isTestEnv ? 10000 : isDevEnv ? 1000 : 100, // High limit for tests/dev
+  max: apiRateMax, // Configurable via RATE_LIMIT_MAX env var
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Please slow down.' },
@@ -142,6 +151,14 @@ export function createApp(corsOrigin: string = 'http://localhost:5173'): express
   app.use(express.json({ limit: '10mb' }));  // Large wiki documents can be several MB
   app.use(express.urlencoded({ extended: true, limit: '10mb' })); // For HTML form submissions
   app.use(cookieParser(sessionSecret));
+
+  // Structured HTTP request logging via pino-http
+  // Skip in test mode to keep test output clean (logger level is 'silent' anyway)
+  if (process.env.NODE_ENV !== 'test') {
+    // pino-http uses CJS-style exports; createRequire bridges the ESM/CJS gap
+    const pinoHttp = require('pino-http');
+    app.use(pinoHttp({ logger, autoLogging: true }));
+  }
 
   // Session middleware for CSRF token storage
   app.use(session({
@@ -238,8 +255,38 @@ export function createApp(corsOrigin: string = 'http://localhost:5173'): express
 
   // Initialize CAIA OAuth client at startup
   initializeCAIA().catch((err) => {
-    console.warn('CAIA initialization failed:', err);
+    logger.warn({ err }, 'CAIA initialization failed');
   });
+
+  // --- Error handling (MUST be after all routes) ---
+
+  // Catch requests that don't match any route → 404 JSON
+  app.use('/api', notFoundHandler);
+
+  // --- Static file serving (production single-service deployment) ---
+  // Serve the Vite-built frontend from the same Express server.
+  // On AWS, CloudFront + S3 handles this instead. On Railway, the API
+  // serves everything from one process.
+  if (process.env.NODE_ENV === 'production') {
+    const __appFilename = fileURLToPath(import.meta.url);
+    const __appDirname = dirname(__appFilename);
+    const staticPath = join(__appDirname, '../../web/dist');
+
+    // Serve static assets (JS, CSS, images) with long cache
+    app.use(express.static(staticPath, {
+      maxAge: '1y',       // Vite hashes filenames — safe to cache indefinitely
+      index: false,       // Don't serve index.html for directory requests (SPA fallback handles it)
+    }));
+
+    // SPA fallback — serve index.html for all non-API, non-file routes.
+    // React Router handles client-side routing from there.
+    app.get('*', (_req, res) => {
+      res.sendFile(join(staticPath, 'index.html'));
+    });
+  }
+
+  // Catch all errors (JSON parse failures, route errors, etc.) → JSON
+  app.use(errorHandler);
 
   return app;
 }

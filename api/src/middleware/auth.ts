@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { SESSION_TIMEOUT_MS, ABSOLUTE_SESSION_TIMEOUT_MS, ERROR_CODES, HTTP_STATUS } from '@ship/shared';
 
 // Extend Express Request to include session info
@@ -95,7 +96,7 @@ export async function authMiddleware(
       next();
       return;
     } catch (error) {
-      console.error('API token auth error:', error);
+      logger.error({ err: error }, 'API token auth error');
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         success: false,
         error: {
@@ -228,7 +229,7 @@ export async function authMiddleware(
 
     next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
+    logger.error({ err: error }, 'Auth middleware error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -305,7 +306,7 @@ export async function workspaceAdminMiddleware(
 
     next();
   } catch (error) {
-    console.error('Workspace admin middleware error:', error);
+    logger.error({ err: error }, 'Workspace admin middleware error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -360,7 +361,7 @@ export async function workspaceAccessMiddleware(
 
     next();
   } catch (error) {
-    console.error('Workspace access middleware error:', error);
+    logger.error({ err: error }, 'Workspace access middleware error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {

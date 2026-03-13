@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -294,7 +295,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
     });
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('Create weekly plan error:', err);
+    logger.error({ err }, 'Create weekly plan error');
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
@@ -381,7 +382,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(plans);
   } catch (err) {
-    console.error('Get weekly plans error:', err);
+    logger.error({ err }, 'Get weekly plans error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -446,7 +447,7 @@ router.get('/:id/history', authMiddleware, async (req: Request, res: Response) =
 
     res.json(history);
   } catch (err) {
-    console.error('Get weekly plan history error:', err);
+    logger.error({ err }, 'Get weekly plan history error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -507,7 +508,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
       updated_at: row.updated_at,
     });
   } catch (err) {
-    console.error('Get weekly plan error:', err);
+    logger.error({ err }, 'Get weekly plan error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -689,7 +690,7 @@ weeklyRetrosRouter.post('/', authMiddleware, async (req: Request, res: Response)
     });
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('Create weekly retro error:', err);
+    logger.error({ err }, 'Create weekly retro error');
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
@@ -776,7 +777,7 @@ weeklyRetrosRouter.get('/', authMiddleware, async (req: Request, res: Response) 
 
     res.json(retros);
   } catch (err) {
-    console.error('Get weekly retros error:', err);
+    logger.error({ err }, 'Get weekly retros error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -841,7 +842,7 @@ weeklyRetrosRouter.get('/:id/history', authMiddleware, async (req: Request, res:
 
     res.json(history);
   } catch (err) {
-    console.error('Get weekly retro history error:', err);
+    logger.error({ err }, 'Get weekly retro history error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -902,7 +903,7 @@ weeklyRetrosRouter.get('/:id', authMiddleware, async (req: Request, res: Respons
       updated_at: row.updated_at,
     });
   } catch (err) {
-    console.error('Get weekly retro error:', err);
+    logger.error({ err }, 'Get weekly retro error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1157,7 +1158,7 @@ router.get('/project-allocation-grid/:projectId', authMiddleware, async (req: Re
       people,
     });
   } catch (err) {
-    console.error('Get project allocation grid error:', err);
+    logger.error({ err }, 'Get project allocation grid error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

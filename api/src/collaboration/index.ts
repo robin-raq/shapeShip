@@ -6,6 +6,7 @@ import * as awarenessProtocol from 'y-protocols/awareness';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { extractHypothesisFromContent, extractSuccessCriteriaFromContent, extractVisionFromContent, extractGoalsFromContent } from '../utils/extractHypothesis.js';
 import { yjsToJson, jsonToYjs } from '../utils/yjsConverter.js';
 import { SESSION_TIMEOUT_MS, ABSOLUTE_SESSION_TIMEOUT_MS } from '@ship/shared';
@@ -174,7 +175,7 @@ async function persistDocument(docName: string, doc: Y.Doc) {
       [Buffer.from(state), JSON.stringify(content), JSON.stringify(updatedProps), docId]
     );
   } catch (err) {
-    console.error('Failed to persist document:', err);
+    logger.error({ err, docName }, 'Failed to persist document');
   }
 }
 
@@ -210,11 +211,11 @@ async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
 
     if (result.rows[0]?.yjs_state) {
       // Load from binary Yjs state (preferred path - content was previously synced)
-      console.log(`[Collaboration] Loading ${docName} from yjs_state`);
+      logger.info({ docName }, 'Loading document from yjs_state');
       Y.applyUpdate(doc, result.rows[0].yjs_state);
     } else if (result.rows[0]?.content) {
       // Fallback: convert JSON content to Yjs (for API-created documents)
-      console.log(`[Collaboration] Converting JSON content to Yjs for ${docName}`);
+      logger.info({ docName }, 'Converting JSON content to Yjs');
       try {
         let jsonContent = result.rows[0].content;
         const originalContent = jsonContent;
@@ -223,7 +224,7 @@ async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
         if (typeof jsonContent === 'string') {
           // Skip if it looks like XML from XmlFragment.toJSON() (starts with <)
           if (jsonContent.trim().startsWith('<')) {
-            console.log(`[Collaboration] Skipping XML-like content for ${docName}, starting with empty document`);
+            logger.warn({ docName }, 'Skipping XML-like content, starting with empty document');
             jsonContent = null;
           } else {
             jsonContent = JSON.parse(jsonContent);
@@ -233,29 +234,30 @@ async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
         if (jsonContent && jsonContent.type === 'doc' && Array.isArray(jsonContent.content)) {
           const fragment = doc.getXmlFragment('default');
           jsonToYjs(doc, fragment, jsonContent);
-          console.log(`[Collaboration] Successfully converted content for ${docName}: ${jsonContent.content.length} top-level nodes`);
+          logger.info({ docName, nodeCount: jsonContent.content.length }, 'Successfully converted content');
           // Mark this doc as freshly loaded from JSON - clients should clear their cache
           freshFromJsonDocs.add(docName);
           // Persist the converted state so this only happens once
           schedulePersist(docName, doc);
         } else {
           // Log why conversion was skipped to help diagnose issues
-          console.warn(`[Collaboration] Content conversion skipped for ${docName}:`, {
+          logger.warn({
+            docName,
             hasContent: !!jsonContent,
             type: jsonContent?.type,
             isContentArray: Array.isArray(jsonContent?.content),
             contentSample: typeof originalContent === 'string' ? originalContent.substring(0, 100) : JSON.stringify(originalContent).substring(0, 100),
-          });
+          }, 'Content conversion skipped');
         }
       } catch (parseErr) {
-        console.error(`[Collaboration] Failed to parse JSON content for ${docName}:`, parseErr);
+        logger.error({ err: parseErr, docName }, 'Failed to parse JSON content');
         // Start with empty document if content is corrupted
       }
     } else {
-      console.log(`[Collaboration] No content found for ${docName}, starting with empty document`);
+      logger.info({ docName }, 'No content found, starting with empty document');
     }
   } catch (err) {
-    console.error(`[Collaboration] Failed to load document ${docName}:`, err);
+    logger.error({ err, docName }, 'Failed to load document');
   }
 
   // Set up persistence and broadcast on changes
@@ -455,7 +457,7 @@ export function invalidateDocumentCache(docId: string): void {
   });
 
   if (docNamesToInvalidate.length === 0) {
-    console.log(`[Collaboration] No cached doc found for ${docId}`);
+    logger.debug({ docId }, 'No cached doc found');
     return;
   }
 
@@ -487,7 +489,7 @@ export function invalidateDocumentCache(docId: string): void {
     docs.delete(docName);
     awareness.delete(docName);
 
-    console.log(`[Collaboration] Invalidated cache for ${docName}`);
+    logger.info({ docName }, 'Invalidated cache');
   }
 }
 
@@ -511,7 +513,7 @@ export function handleDocumentConversion(
     return; // No active connections to this document
   }
 
-  console.log(`[Collaboration] Document ${oldDocId} converted to ${newDocType} (${newDocId}), notifying ${connectionsToNotify.length} collaborators`);
+  logger.info({ oldDocId, newDocId, newDocType, collaboratorCount: connectionsToNotify.length }, 'Document converted, notifying collaborators');
 
   // Put conversion info in close reason (JSON fits within 123-byte limit)
   const closeReason = JSON.stringify({
@@ -546,7 +548,7 @@ export async function handleVisibilityChange(
     return; // No active connections to this document
   }
 
-  console.log(`[Collaboration] Visibility change for doc ${docId} to '${newVisibility}', checking ${connectionsToCheck.length} connections`);
+  logger.info({ docId, newVisibility, connectionCount: connectionsToCheck.length }, 'Visibility change, checking connections');
 
   // For private documents, only creator and admins can access
   // For workspace documents, all workspace members can access (no action needed)
@@ -565,7 +567,7 @@ export async function handleVisibilityChange(
     const canAccess = await canAccessDocumentForCollab(docId, conn.userId, conn.workspaceId);
 
     if (!canAccess) {
-      console.log(`[Collaboration] Disconnecting user ${conn.userId} from private doc ${docId}`);
+      logger.info({ userId: conn.userId, docId }, 'Disconnecting user from private doc');
 
       // Close with code 4403 (custom code for "access revoked")
       // Frontend should handle this code and show appropriate message
@@ -596,7 +598,7 @@ export function broadcastToUser(userId: string, eventType: string, data?: Record
   });
 
   if (sentCount > 0) {
-    console.log(`[Events] Broadcast '${eventType}' to user ${userId} (${sentCount} connections)`);
+    logger.debug({ eventType, userId, sentCount }, 'Broadcast event to user');
   }
 }
 
@@ -691,7 +693,7 @@ export function setupCollaboration(server: Server) {
     // If this doc was loaded fresh from JSON (API-created or API-updated content),
     // tell the browser to clear its IndexedDB cache before sync to prevent stale content merge
     if (freshFromJsonDocs.has(docName)) {
-      console.log(`[Collaboration] Sending cache clear signal for ${docName} (loaded fresh from JSON)`);
+      logger.info({ docName }, 'Sending cache clear signal (loaded fresh from JSON)');
       const clearCacheEncoder = encoding.createEncoder();
       encoding.writeVarUint(clearCacheEncoder, messageClearCache);
       ws.send(encoding.toUint8Array(clearCacheEncoder));
@@ -788,7 +790,7 @@ export function setupCollaboration(server: Server) {
   // Handle events WebSocket connections (for real-time notifications)
   eventsWss.on('connection', (ws: WebSocket, sessionData: { userId: string; workspaceId: string }) => {
     eventConns.set(ws, { userId: sessionData.userId, workspaceId: sessionData.workspaceId });
-    console.log(`[Events] User ${sessionData.userId} connected (${eventConns.size} total connections)`);
+    logger.info({ userId: sessionData.userId, totalConnections: eventConns.size }, 'Events user connected');
 
     // Send initial connected message
     ws.send(JSON.stringify({ type: 'connected', data: {} }));
@@ -801,7 +803,7 @@ export function setupCollaboration(server: Server) {
         rateLimitViolations.set(ws, violations);
 
         if (violations >= RATE_LIMIT_VIOLATION_THRESHOLD) {
-          console.log(`[Events] Rate limit violations exceeded for user ${sessionData.userId}, closing connection`);
+          logger.warn({ userId: sessionData.userId }, 'Events rate limit violations exceeded, closing connection');
           ws.close(1008, 'Rate limit exceeded');
         }
         return;
@@ -825,10 +827,10 @@ export function setupCollaboration(server: Server) {
       eventConns.delete(ws);
       rateLimitViolations.delete(ws);
       messageTimestamps.delete(ws);
-      console.log(`[Events] User ${sessionData.userId} disconnected (${eventConns.size} total connections)`);
+      logger.info({ userId: sessionData.userId, totalConnections: eventConns.size }, 'Events user disconnected');
     });
   });
 
-  console.log('Yjs collaboration server attached');
-  console.log('Events WebSocket server attached');
+  logger.info('Yjs collaboration server attached');
+  logger.info('Events WebSocket server attached');
 }

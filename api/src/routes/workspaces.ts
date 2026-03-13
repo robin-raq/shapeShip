@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import type { Router as RouterType } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { authMiddleware, workspaceAdminMiddleware } from '../middleware/auth.js';
 import { ERROR_CODES, HTTP_STATUS } from '@ship/shared';
 import { logAuditEvent } from '../services/audit.js';
@@ -68,7 +69,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response): Promise<voi
       data: { workspaces, isSuperAdmin },
     });
   } catch (error) {
-    console.error('List workspaces error:', error);
+    logger.error({ err: error }, 'List workspaces error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -129,7 +130,7 @@ router.get('/current', authMiddleware, async (req: Request, res: Response): Prom
       },
     });
   } catch (error) {
-    console.error('Get current workspace error:', error);
+    logger.error({ err: error }, 'Get current workspace error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -223,7 +224,7 @@ router.post('/:id/switch', authMiddleware, async (req: Request, res: Response): 
       data: { workspaceId },
     });
   } catch (error) {
-    console.error('Switch workspace error:', error);
+    logger.error({ err: error }, 'Switch workspace error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -310,7 +311,7 @@ router.get('/:id/members', authMiddleware, workspaceAdminMiddleware, async (req:
       data: { members },
     });
   } catch (error) {
-    console.error('List members error:', error);
+    logger.error({ err: error }, 'List members error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -409,7 +410,7 @@ router.post('/:id/members', authMiddleware, workspaceAdminMiddleware, async (req
       },
     });
   } catch (error) {
-    console.error('Add member error:', error);
+    logger.error({ err: error }, 'Add member error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -500,7 +501,7 @@ router.patch('/:id/members/:userId', authMiddleware, workspaceAdminMiddleware, a
       data: { role },
     });
   } catch (error) {
-    console.error('Update member role error:', error);
+    logger.error({ err: error }, 'Update member role error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -597,7 +598,7 @@ router.delete('/:id/members/:userId', authMiddleware, workspaceAdminMiddleware, 
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Remove member error:', error);
+    logger.error({ err: error }, 'Remove member error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -679,7 +680,7 @@ router.post('/:id/members/:userId/restore', authMiddleware, workspaceAdminMiddle
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Restore member error:', error);
+    logger.error({ err: error }, 'Restore member error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -720,7 +721,7 @@ router.get('/:id/invites', authMiddleware, workspaceAdminMiddleware, async (req:
       data: { invites },
     });
   } catch (error) {
-    console.error('List invites error:', error);
+    logger.error({ err: error }, 'List invites error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -953,7 +954,7 @@ router.post('/:id/invites', authMiddleware, workspaceAdminMiddleware, async (req
       },
     });
   } catch (error) {
-    console.error('Create invite error:', error);
+    logger.error({ err: error }, 'Create invite error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -1006,7 +1007,7 @@ router.delete('/:id/invites/:inviteId', authMiddleware, workspaceAdminMiddleware
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Revoke invite error:', error);
+    logger.error({ err: error }, 'Revoke invite error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -1056,7 +1057,7 @@ router.get('/:id/audit-logs', authMiddleware, workspaceAdminMiddleware, async (r
       data: { logs },
     });
   } catch (error) {
-    console.error('Get audit logs error:', error);
+    logger.error({ err: error }, 'Get audit logs error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {

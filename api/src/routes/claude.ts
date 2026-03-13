@@ -14,6 +14,7 @@
 
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = Router();
@@ -106,7 +107,7 @@ router.get('/context', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(context);
   } catch (error) {
-    console.error('Error fetching Claude context:', error);
+    logger.error({ err: error }, 'Error fetching Claude context');
     res.status(500).json({ error: 'Failed to fetch context' });
   }
 });

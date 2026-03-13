@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -12,6 +13,7 @@ import {
   type BelongsToEntry,
 } from '../utils/document-crud.js';
 import { broadcastToUser } from '../collaboration/index.js';
+import type { QueryParam, IssueQueryRow } from '../types/db-rows.js';
 
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
@@ -79,7 +81,7 @@ const rejectIssueSchema = z.object({
 });
 
 // Helper to extract issue properties from row (without belongs_to - added separately)
-function extractIssueFromRow(row: any) {
+function extractIssueFromRow(row: IssueQueryRow) {
   const props = row.properties || {};
   return {
     id: row.id,
@@ -123,7 +125,6 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 
     let query = `
       SELECT d.id, d.title, d.properties, d.ticket_number,
-             d.content,
              d.created_at, d.updated_at, d.created_by,
              d.started_at, d.completed_at, d.cancelled_at, d.reopened_at,
              d.converted_from_id,
@@ -220,6 +221,12 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       END,
       d.updated_at DESC`;
 
+    // Pagination: default 50 rows, max 200
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
+    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+    query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit as any, offset as any);
+
     const result = await pool.query(query, params);
 
     // Extract issues and batch-fetch associations to avoid N+1 queries
@@ -237,7 +244,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(issues);
   } catch (err) {
-    console.error('List issues error:', err);
+    logger.error({ err }, 'List issues error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -328,7 +335,7 @@ router.get('/action-items', authMiddleware, async (req: Request, res: Response) 
       total: items.length,
     });
   } catch (err) {
-    console.error('Get action items error:', err);
+    logger.error({ err }, 'Get action items error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -406,7 +413,7 @@ router.get('/by-ticket/:number', authMiddleware, async (req: Request, res: Respo
       belongs_to,
     });
   } catch (err) {
-    console.error('Get issue by ticket error:', err);
+    logger.error({ err }, 'Get issue by ticket error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -484,7 +491,7 @@ router.get('/:id/children', authMiddleware, async (req: Request, res: Response) 
 
     res.json(children);
   } catch (err) {
-    console.error('Get issue children error:', err);
+    logger.error({ err }, 'Get issue children error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -553,7 +560,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
       belongs_to,
     });
   } catch (err) {
-    console.error('Get issue error:', err);
+    logger.error({ err }, 'Get issue error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -664,7 +671,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
     });
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('Create issue error:', err);
+    logger.error({ err }, 'Create issue error');
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
@@ -705,7 +712,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
     const existingIssue = existing.rows[0];
     const currentProps = existingIssue.properties || {};
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: QueryParam[] = [];
     let paramIndex = 1;
 
     const data = parsed.data;
@@ -1000,7 +1007,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
     res.json({ ...issue, display_id: displayId, belongs_to: belongsTo });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
-    console.error('Update issue error:', err);
+    logger.error({ err }, 'Update issue error');
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
@@ -1053,7 +1060,7 @@ router.get('/:id/history', authMiddleware, async (req: Request, res: Response) =
       automated_by: row.automated_by,
     })));
   } catch (err) {
-    console.error('Get issue history error:', err);
+    logger.error({ err }, 'Get issue history error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1109,7 +1116,7 @@ router.post('/:id/history', authMiddleware, async (req: Request, res: Response) 
 
     res.status(201).json({ success: true });
   } catch (err) {
-    console.error('Log history entry error:', err);
+    logger.error({ err }, 'Log history entry error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1207,7 +1214,7 @@ router.post('/bulk', authMiddleware, async (req: Request, res: Response) => {
         }
 
         const setClauses: string[] = ['updated_at = NOW()'];
-        const values: any[] = [validIds, workspaceId];
+        const values: QueryParam[] = [validIds as unknown as QueryParam, workspaceId];
         let paramIdx = 3;
 
         if (updates.state !== undefined) {
@@ -1320,7 +1327,7 @@ router.post('/bulk', authMiddleware, async (req: Request, res: Response) => {
     res.json({ updated, failed });
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('Bulk update issues error:', err);
+    logger.error({ err }, 'Bulk update issues error');
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
@@ -1370,7 +1377,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     res.status(204).send();
   } catch (err) {
-    console.error('Delete issue error:', err);
+    logger.error({ err }, 'Delete issue error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1422,7 +1429,7 @@ router.post('/:id/accept', authMiddleware, async (req: Request, res: Response) =
     const issue = extractIssueFromRow(result.rows[0]);
     res.json({ ...issue, display_id: `#${issue.ticket_number}` });
   } catch (err) {
-    console.error('Accept issue error:', err);
+    logger.error({ err }, 'Accept issue error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1504,7 +1511,7 @@ router.post('/:id/iterations', authMiddleware, async (req: Request, res: Respons
       updated_at: iteration.updated_at,
     });
   } catch (err) {
-    console.error('Create iteration error:', err);
+    logger.error({ err }, 'Create iteration error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1574,7 +1581,7 @@ router.get('/:id/iterations', authMiddleware, async (req: Request, res: Response
 
     res.json(iterations);
   } catch (err) {
-    console.error('Get iterations error:', err);
+    logger.error({ err }, 'Get iterations error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1634,7 +1641,7 @@ router.post('/:id/reject', authMiddleware, async (req: Request, res: Response) =
     const issue = extractIssueFromRow(result.rows[0]);
     res.json({ ...issue, display_id: `#${issue.ticket_number}` });
   } catch (err) {
-    console.error('Reject issue error:', err);
+    logger.error({ err }, 'Reject issue error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -7,6 +7,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { logger } from '../config/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { analyzePlan, analyzeRetro, isAiAvailable, checkRateLimit } from '../services/ai-analysis.js';
 
@@ -38,7 +39,7 @@ router.post('/analyze-plan', authMiddleware, async (req: Request, res: Response)
     const result = await analyzePlan(content);
     res.json(result);
   } catch (err) {
-    console.error('Analyze plan error:', err);
+    logger.error({ err }, 'Analyze plan error');
     res.json({ error: 'ai_unavailable' });
   }
 });
@@ -68,7 +69,7 @@ router.post('/analyze-retro', authMiddleware, async (req: Request, res: Response
     const result = await analyzeRetro(retro_content, plan_content);
     res.json(result);
   } catch (err) {
-    console.error('Analyze retro error:', err);
+    logger.error({ err }, 'Analyze retro error');
     res.json({ error: 'ai_unavailable' });
   }
 });

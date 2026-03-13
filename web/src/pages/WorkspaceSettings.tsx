@@ -296,11 +296,11 @@ function MembersTab({
         <table className="w-full">
           <thead className="bg-border/30">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted">Name</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted">Email</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted">Role</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted">Joined</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-muted">Actions</th>
+              <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Name</th>
+              <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Email</th>
+              <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Role</th>
+              <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Joined</th>
+              <th scope="col" className="px-4 py-3 text-right text-sm font-medium text-muted">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -469,11 +469,11 @@ function InvitesTab({
           <table className="w-full">
             <thead className="bg-border/30">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-muted">Email</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-muted">PIV Identity</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-muted">Role</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-muted">Expires</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-muted">Actions</th>
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Email</th>
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">PIV Identity</th>
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Role</th>
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Expires</th>
+                <th scope="col" className="px-4 py-3 text-right text-sm font-medium text-muted">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -664,12 +664,12 @@ function ApiTokensTab({
           <table className="w-full">
             <thead className="bg-border/30">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-muted">Name</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-muted">Prefix</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-muted">Status</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-muted">Last Used</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-muted">Expires</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-muted">Actions</th>
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Name</th>
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Prefix</th>
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Status</th>
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Last Used</th>
+                <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Expires</th>
+                <th scope="col" className="px-4 py-3 text-right text-sm font-medium text-muted">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -722,10 +722,10 @@ function AuditTab({ auditLogs }: { auditLogs: AuditLog[] }) {
       <table className="w-full">
         <thead className="bg-border/30">
           <tr>
-            <th className="px-4 py-3 text-left text-sm font-medium text-muted">Time</th>
-            <th className="px-4 py-3 text-left text-sm font-medium text-muted">Actor</th>
-            <th className="px-4 py-3 text-left text-sm font-medium text-muted">Action</th>
-            <th className="px-4 py-3 text-left text-sm font-medium text-muted">Resource</th>
+            <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Time</th>
+            <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Actor</th>
+            <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Action</th>
+            <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Resource</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">

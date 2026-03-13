@@ -5,13 +5,13 @@ export default {
     extend: {
       colors: {
         // Linear-inspired neutral palette
-        // All colors meet WCAG 2.1 AA contrast requirements (4.5:1 minimum)
+        // All colors meet WCAG 2.1 AA contrast requirements (4.5:1 minimum on #0d0d0d)
         background: '#0d0d0d',
         foreground: '#f5f5f5',
-        muted: '#8a8a8a', // Changed from #737373 (4.09:1) to #8a8a8a (5.1:1 contrast)
+        muted: '#8a8a8a', // 5.1:1 contrast on background
         border: '#262626',
-        accent: '#005ea2', // Logo blue
-        'accent-hover': '#0071bc', // Lighter blue for hover
+        accent: '#2e8bc9', // USWDS blue lightened for dark bg (5.21:1 contrast)
+        'accent-hover': '#3d97d3', // Hover variant (6.12:1 contrast)
       },
       fontFamily: {
         sans: [

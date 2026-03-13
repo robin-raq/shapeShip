@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { z } from 'zod';
 
@@ -215,7 +216,7 @@ router.get('/:entityType/:entityId', authMiddleware, async (req: Request, res: R
       })),
     });
   } catch (error) {
-    console.error('Activity fetch error:', error);
+    logger.error({ err: error }, 'Activity fetch error');
     res.status(500).json({ error: 'Failed to fetch activity data' });
   }
 });

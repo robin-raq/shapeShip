@@ -1,9 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
 import { authMiddleware } from '../middleware/auth.js';
+import type { QueryParam } from '../types/db-rows.js';
 
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
@@ -126,7 +128,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
       updated_at: doc.updated_at,
     });
   } catch (err) {
-    console.error('Create standup error:', err);
+    logger.error({ err }, 'Create standup error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -190,7 +192,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(standups);
   } catch (err) {
-    console.error('Get standups error:', err);
+    logger.error({ err }, 'Get standups error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -296,7 +298,7 @@ router.get('/status', authMiddleware, async (req: Request, res: Response) => {
 
     res.json({ due, lastPosted });
   } catch (err) {
-    console.error('Get standup status error:', err);
+    logger.error({ err }, 'Get standup status error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -379,7 +381,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     // Build update query
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: QueryParam[] = [];
     let paramIndex = 1;
 
     if (content !== undefined) {
@@ -429,7 +431,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
       updated_at: standup.updated_at,
     });
   } catch (err) {
-    console.error('Update standup error:', err);
+    logger.error({ err }, 'Update standup error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -491,7 +493,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     res.status(204).send();
   } catch (err) {
-    console.error('Delete standup error:', err);
+    logger.error({ err }, 'Delete standup error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

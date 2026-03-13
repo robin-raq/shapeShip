@@ -2,6 +2,7 @@ import pg from 'pg';
 import { config } from 'dotenv';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { logger } from '../config/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -27,16 +28,16 @@ const pool = new Pool({
 
 // Graceful shutdown - close pool connections on process termination
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, closing database pool...');
+  logger.info('SIGTERM received, closing database pool');
   await pool.end();
-  console.log('Database pool closed');
+  logger.info('Database pool closed');
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('SIGINT received, closing database pool...');
+  logger.info('SIGINT received, closing database pool');
   await pool.end();
-  console.log('Database pool closed');
+  logger.info('Database pool closed');
   process.exit(0);
 });
 

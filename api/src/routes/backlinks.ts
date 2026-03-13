@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -61,7 +62,7 @@ router.get('/:id/backlinks', authMiddleware, async (req: Request, res: Response)
 
     res.json(backlinks);
   } catch (err) {
-    console.error('Get backlinks error:', err);
+    logger.error({ err }, 'Get backlinks error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -146,7 +147,7 @@ router.post('/:id/links', authMiddleware, async (req: Request, res: Response) =>
       client.release();
     }
   } catch (err) {
-    console.error('Update links error:', err);
+    logger.error({ err }, 'Update links error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

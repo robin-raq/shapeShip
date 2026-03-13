@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import type { Router as RouterType } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { authMiddleware, superAdminMiddleware } from '../middleware/auth.js';
 import { ERROR_CODES, HTTP_STATUS } from '@ship/shared';
 import { logAuditEvent } from '../services/audit.js';
@@ -42,7 +43,7 @@ router.get('/workspaces', async (req: Request, res: Response): Promise<void> => 
       data: { workspaces },
     });
   } catch (error) {
-    console.error('Admin list workspaces error:', error);
+    logger.error({ err: error }, 'Admin list workspaces error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -151,7 +152,7 @@ router.post('/workspaces', async (req: Request, res: Response): Promise<void> =>
       },
     });
   } catch (error) {
-    console.error('Create workspace error:', error);
+    logger.error({ err: error }, 'Create workspace error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -268,7 +269,7 @@ router.patch('/workspaces/:id', async (req: Request, res: Response): Promise<voi
       },
     });
   } catch (error) {
-    console.error('Update workspace error:', error);
+    logger.error({ err: error }, 'Update workspace error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -317,7 +318,7 @@ router.post('/workspaces/:id/archive', async (req: Request, res: Response): Prom
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Archive workspace error:', error);
+    logger.error({ err: error }, 'Archive workspace error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -364,7 +365,7 @@ router.get('/users', async (req: Request, res: Response): Promise<void> => {
       data: { users },
     });
   } catch (error) {
-    console.error('List users error:', error);
+    logger.error({ err: error }, 'List users error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -431,7 +432,7 @@ router.get('/users/search', async (req: Request, res: Response): Promise<void> =
       data: { users },
     });
   } catch (error) {
-    console.error('Search users error:', error);
+    logger.error({ err: error }, 'Search users error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -504,7 +505,7 @@ router.patch('/users/:id/super-admin', async (req: Request, res: Response): Prom
       data: { isSuperAdmin: result.rows[0].is_super_admin },
     });
   } catch (error) {
-    console.error('Toggle super-admin error:', error);
+    logger.error({ err: error }, 'Toggle super-admin error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -579,7 +580,7 @@ router.get('/audit-logs', async (req: Request, res: Response): Promise<void> => 
       data: { logs },
     });
   } catch (error) {
-    console.error('Get global audit logs error:', error);
+    logger.error({ err: error }, 'Get global audit logs error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -653,7 +654,7 @@ router.get('/audit-logs/export', async (req: Request, res: Response): Promise<vo
     res.setHeader('Content-Disposition', `attachment; filename="audit-logs-${new Date().toISOString().split('T')[0]}.csv"`);
     res.send(csv);
   } catch (error) {
-    console.error('Export audit logs error:', error);
+    logger.error({ err: error }, 'Export audit logs error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -708,7 +709,7 @@ router.post('/impersonate/:userId', async (req: Request, res: Response): Promise
       },
     });
   } catch (error) {
-    console.error('Start impersonation error:', error);
+    logger.error({ err: error }, 'Start impersonation error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -730,7 +731,7 @@ router.delete('/impersonate', async (req: Request, res: Response): Promise<void>
 
     res.json({ success: true });
   } catch (error) {
-    console.error('End impersonation error:', error);
+    logger.error({ err: error }, 'End impersonation error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -783,7 +784,7 @@ router.get('/workspaces/:id', async (req: Request, res: Response): Promise<void>
       },
     });
   } catch (error) {
-    console.error('Get workspace error:', error);
+    logger.error({ err: error }, 'Get workspace error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -833,7 +834,7 @@ router.get('/workspaces/:id/members', async (req: Request, res: Response): Promi
       data: { members },
     });
   } catch (error) {
-    console.error('List workspace members error:', error);
+    logger.error({ err: error }, 'List workspace members error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -883,7 +884,7 @@ router.get('/workspaces/:id/invites', async (req: Request, res: Response): Promi
       data: { invites },
     });
   } catch (error) {
-    console.error('List workspace invites error:', error);
+    logger.error({ err: error }, 'List workspace invites error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -1041,7 +1042,7 @@ router.post('/workspaces/:id/invites', async (req: Request, res: Response): Prom
       },
     });
   } catch (error) {
-    console.error('Create workspace invite error:', error);
+    logger.error({ err: error }, 'Create workspace invite error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -1111,7 +1112,7 @@ router.delete('/workspaces/:workspaceId/invites/:inviteId', async (req: Request,
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Revoke workspace invite error:', error);
+    logger.error({ err: error }, 'Revoke workspace invite error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -1236,7 +1237,7 @@ router.post('/workspaces/:id/members', async (req: Request, res: Response): Prom
       },
     });
   } catch (error) {
-    console.error('Add workspace member error:', error);
+    logger.error({ err: error }, 'Add workspace member error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -1340,7 +1341,7 @@ router.patch('/workspaces/:workspaceId/members/:userId', async (req: Request, re
       data: { role },
     });
   } catch (error) {
-    console.error('Update member role error:', error);
+    logger.error({ err: error }, 'Update member role error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -1439,7 +1440,7 @@ router.delete('/workspaces/:workspaceId/members/:userId', async (req: Request, r
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Remove member error:', error);
+    logger.error({ err: error }, 'Remove member error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -1548,7 +1549,7 @@ router.get('/debug/users', async (req: Request, res: Response): Promise<void> =>
       },
     });
   } catch (error) {
-    console.error('Debug users error:', error);
+    logger.error({ err: error }, 'Debug users error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -1658,7 +1659,7 @@ router.get('/debug/orphans', async (req: Request, res: Response): Promise<void> 
       },
     });
   } catch (error) {
-    console.error('Debug orphans error:', error);
+    logger.error({ err: error }, 'Debug orphans error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -1722,7 +1723,7 @@ router.post('/debug/orphans/fix', async (req: Request, res: Response): Promise<v
       client.release();
     }
   } catch (error) {
-    console.error('Fix orphans error:', error);
+    logger.error({ err: error }, 'Fix orphans error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {
@@ -1788,7 +1789,7 @@ router.delete('/debug/users/:id', async (req: Request, res: Response): Promise<v
       data: { deletedUser: targetUser },
     });
   } catch (error) {
-    console.error('Delete user error:', error);
+    logger.error({ err: error }, 'Delete user error');
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       error: {

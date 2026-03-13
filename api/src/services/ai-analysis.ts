@@ -12,6 +12,7 @@
 import { createHash } from 'crypto';
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { extractText } from '../utils/document-content.js';
+import { logger } from '../config/logger.js';
 
 const MODEL_ID = 'global.anthropic.claude-opus-4-5-20251101-v1:0';
 const REGION = 'us-east-1';
@@ -28,7 +29,7 @@ function getClient(): BedrockRuntimeClient | null {
     bedrockClient = new BedrockRuntimeClient({ region: REGION });
     return bedrockClient;
   } catch (err) {
-    console.warn('Failed to initialize Bedrock client:', err);
+    logger.warn({ err }, 'Failed to initialize Bedrock client');
     clientInitFailed = true;
     return null;
   }
@@ -304,7 +305,7 @@ export async function analyzePlan(content: unknown): Promise<PlanAnalysisResult 
     result.content_hash = contentHash;
     return result;
   } catch (err) {
-    console.error('Plan analysis error:', err);
+    logger.error({ err }, 'Plan analysis error');
     return { error: 'ai_unavailable' };
   }
 }
@@ -365,7 +366,7 @@ export async function analyzeRetro(
 
     return result;
   } catch (err) {
-    console.error('Retro analysis error:', err);
+    logger.error({ err }, 'Retro analysis error');
     return { error: 'ai_unavailable' };
   }
 }

@@ -248,10 +248,10 @@ export function AdminWorkspaceDetailPage() {
               <table className="w-full">
                 <thead className="bg-border/30">
                   <tr>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted">Name</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted">Email</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted">Role</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium text-muted">Actions</th>
+                    <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Name</th>
+                    <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Email</th>
+                    <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Role</th>
+                    <th scope="col" className="px-4 py-3 text-right text-sm font-medium text-muted">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -301,11 +301,11 @@ export function AdminWorkspaceDetailPage() {
               <table className="w-full">
                 <thead className="bg-border/30">
                   <tr>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted">Email</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted">PIV Identity</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted">Role</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-muted">Sent</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium text-muted">Actions</th>
+                    <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Email</th>
+                    <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">PIV Identity</th>
+                    <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Role</th>
+                    <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Sent</th>
+                    <th scope="col" className="px-4 py-3 text-right text-sm font-medium text-muted">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">

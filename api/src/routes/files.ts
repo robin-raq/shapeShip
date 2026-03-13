@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import express from 'express';
+import { logger } from '../config/logger.js';
 import { pool } from '../db/client.js';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
@@ -130,7 +131,7 @@ filesRouter.post('/upload', authMiddleware, async (req: Request, res: Response) 
       s3Key,
     });
   } catch (error) {
-    console.error('Error creating upload:', error);
+    logger.error({ err: error }, 'Error creating upload');
     res.status(500).json({ error: 'Failed to create upload' });
   }
 });
@@ -211,7 +212,7 @@ filesRouter.post('/:id/local-upload', rawBodyParser, authMiddleware, async (req:
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Error uploading file locally:', error);
+    logger.error({ err: error }, 'Error uploading file locally');
     res.status(500).json({ error: 'Failed to upload file' });
   }
 });
@@ -271,7 +272,7 @@ filesRouter.post('/:id/confirm', authMiddleware, async (req: Request, res: Respo
       status: 'uploaded',
     });
   } catch (error) {
-    console.error('Error confirming upload:', error);
+    logger.error({ err: error }, 'Error confirming upload');
     res.status(500).json({ error: 'Failed to confirm upload' });
   }
 });
@@ -310,7 +311,7 @@ filesRouter.get('/:id/serve', authMiddleware, async (req: Request, res: Response
     res.setHeader('Content-Disposition', `inline; filename="${file.filename}"`);
     res.sendFile(filePath);
   } catch (error) {
-    console.error('Error serving file:', error);
+    logger.error({ err: error }, 'Error serving file');
     res.status(500).json({ error: 'Failed to serve file' });
   }
 });
@@ -342,7 +343,7 @@ filesRouter.get('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     res.json(result.rows[0]);
   } catch (error) {
-    console.error('Error getting file:', error);
+    logger.error({ err: error }, 'Error getting file');
     res.status(500).json({ error: 'Failed to get file' });
   }
 });
@@ -397,7 +398,7 @@ filesRouter.delete('/:id', authMiddleware, async (req: Request, res: Response) =
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Error deleting file:', error);
+    logger.error({ err: error }, 'Error deleting file');
     res.status(500).json({ error: 'Failed to delete file' });
   }
 });

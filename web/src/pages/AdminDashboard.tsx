@@ -290,11 +290,11 @@ function WorkspacesTab({
         <table className="w-full">
           <thead className="bg-border/30">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted">Name</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted">Members</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted">Status</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted">Created</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-muted">Actions</th>
+              <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Name</th>
+              <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Members</th>
+              <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Status</th>
+              <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Created</th>
+              <th scope="col" className="px-4 py-3 text-right text-sm font-medium text-muted">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -354,11 +354,11 @@ function UsersTab({
       <table className="w-full">
         <thead className="bg-border/30">
           <tr>
-            <th className="px-4 py-3 text-left text-sm font-medium text-muted">Name</th>
-            <th className="px-4 py-3 text-left text-sm font-medium text-muted">Email</th>
-            <th className="px-4 py-3 text-left text-sm font-medium text-muted">Workspaces</th>
-            <th className="px-4 py-3 text-left text-sm font-medium text-muted">Super Admin</th>
-            <th className="px-4 py-3 text-right text-sm font-medium text-muted">Actions</th>
+            <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Name</th>
+            <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Email</th>
+            <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Workspaces</th>
+            <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Super Admin</th>
+            <th scope="col" className="px-4 py-3 text-right text-sm font-medium text-muted">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -424,11 +424,11 @@ function AuditLogsTab({
         <table className="w-full">
           <thead className="bg-border/30">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted">Time</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted">Actor</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted">Action</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted">Resource</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-muted">Details</th>
+              <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Time</th>
+              <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Actor</th>
+              <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Action</th>
+              <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Resource</th>
+              <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted">Details</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">

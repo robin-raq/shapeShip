@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import type { OpenAPIObject } from 'openapi3-ts/oas30';
+import { logger } from './config/logger.js';
 
 // Import the OpenAPI module to register all schemas
 import { generateOpenAPIDocument } from './openapi/index.js';
@@ -95,10 +96,10 @@ export function generateOpenApiFile(): void {
   const yaml = jsonToYaml(swaggerSpec);
   const outputPath = path.join(__dirname, '..', 'openapi.yaml');
   fs.writeFileSync(outputPath, yaml, 'utf-8');
-  console.log(`OpenAPI spec written to ${outputPath}`);
+  logger.info({ outputPath }, 'OpenAPI YAML spec written');
 
   // Also generate JSON version
   const jsonPath = path.join(__dirname, '..', 'openapi.json');
   fs.writeFileSync(jsonPath, JSON.stringify(swaggerSpec, null, 2), 'utf-8');
-  console.log(`OpenAPI spec written to ${jsonPath}`);
+  logger.info({ outputPath: jsonPath }, 'OpenAPI JSON spec written');
 }

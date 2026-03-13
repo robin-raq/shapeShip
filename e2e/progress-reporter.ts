@@ -178,6 +178,9 @@ class ProgressReporter implements Reporter {
     const errorFileName = `${safeFileName}__${safeTitle}.log`;
     const errorPath = path.join(ERRORS_DIR, errorFileName);
 
+    // Defensive mkdir in case onBegin hasn't completed or directory was cleaned
+    fs.mkdirSync(ERRORS_DIR, { recursive: true });
+
     const errorContent = [
       `Test: ${testFile}`,
       `Title: ${test.title}`,

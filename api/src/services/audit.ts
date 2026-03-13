@@ -1,5 +1,6 @@
 import { Request } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 
 interface AuditEventInput {
   workspaceId?: string | null;
@@ -36,6 +37,6 @@ export async function logAuditEvent(input: AuditEventInput): Promise<void> {
     );
   } catch (error) {
     // Log but don't fail the request if audit logging fails
-    console.error('Failed to log audit event:', error);
+    logger.error({ err: error }, 'Failed to log audit event');
   }
 }

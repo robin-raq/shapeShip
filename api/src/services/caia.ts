@@ -13,6 +13,7 @@ import {
   getCAIACredentials,
   type CAIACredentials,
 } from './secrets-manager.js';
+import { logger } from '../config/logger.js';
 
 /**
  * User information extracted from CAIA ID token
@@ -68,7 +69,7 @@ function getRedirectUri(): string {
     throw new Error('APP_BASE_URL environment variable is required');
   }
   const redirectUri = `${baseUrl}/api/auth/piv/callback`;
-  console.log(`[CAIA] Using redirect_uri: ${redirectUri}`);
+  logger.info({ redirectUri }, 'CAIA using redirect_uri');
   return redirectUri;
 }
 
@@ -97,15 +98,15 @@ export async function isCAIAConfigured(): Promise<boolean> {
 export async function initializeCAIA(): Promise<void> {
   const configured = await isCAIAConfigured();
   if (!configured) {
-    console.log('CAIA not configured, skipping initialization');
+    logger.info('CAIA not configured, skipping initialization');
     return;
   }
 
   try {
     const config = await discoverIssuer();
-    console.log('CAIA issuer discovered:', config.serverMetadata().issuer);
+    logger.info({ issuer: config.serverMetadata().issuer }, 'CAIA issuer discovered');
   } catch (err) {
-    console.error('Failed to discover CAIA issuer:', err);
+    logger.error({ err }, 'Failed to discover CAIA issuer');
     throw err;
   }
 }
@@ -115,10 +116,9 @@ export async function initializeCAIA(): Promise<void> {
  * Fetches credentials fresh from Secrets Manager
  */
 async function discoverIssuer(): Promise<client.Configuration> {
-  console.log('[CAIA] Discovering issuer...');
+  logger.info('CAIA discovering issuer');
   const creds = await fetchCredentials();
-  console.log(`[CAIA]   Issuer URL: ${creds.issuer_url}`);
-  console.log(`[CAIA]   Client ID: ${creds.client_id}`);
+  logger.info({ issuerUrl: creds.issuer_url, clientId: creds.client_id }, 'CAIA issuer credentials loaded');
 
   try {
     const config = await client.discovery(
@@ -127,17 +127,15 @@ async function discoverIssuer(): Promise<client.Configuration> {
       creds.client_secret,
     );
     const metadata = config.serverMetadata();
-    console.log(`[CAIA] Issuer discovered successfully: ${metadata.issuer}`);
-    console.log(`[CAIA] Token endpoint: ${metadata.token_endpoint}`);
-    console.log(`[CAIA] Supported token auth methods: ${JSON.stringify(metadata.token_endpoint_auth_methods_supported)}`);
+    logger.info({
+      issuer: metadata.issuer,
+      tokenEndpoint: metadata.token_endpoint,
+      supportedAuthMethods: metadata.token_endpoint_auth_methods_supported,
+    }, 'CAIA issuer discovered successfully');
     return config;
   } catch (err) {
     const error = err as Error & { cause?: unknown; code?: string };
-    console.error(`[CAIA] Discovery failed during auth flow:`);
-    console.error(`[CAIA]   Error: ${error.message}`);
-    if (error.cause) {
-      console.error(`[CAIA]   Cause:`, error.cause);
-    }
+    logger.error({ err: error, cause: error.cause }, 'CAIA discovery failed during auth flow');
     throw err;
   }
 }
@@ -217,13 +215,11 @@ export async function handleCallback(
   code: string,
   params: { state: string; nonce: string; codeVerifier: string }
 ): Promise<CAIACallbackResult> {
-  console.log('[CAIA] Handling OAuth callback...');
-  console.log(`[CAIA]   Code: ${code.substring(0, 10)}...`);
-  console.log(`[CAIA]   State: ${params.state}`);
+  logger.info({ codePrefix: code.substring(0, 10), state: params.state }, 'CAIA handling OAuth callback');
 
   const config = await discoverIssuer();
   const redirectUri = getRedirectUri();
-  console.log(`[CAIA]   Redirect URI: ${redirectUri}`);
+  logger.info({ redirectUri }, 'CAIA callback redirect URI');
 
   // Build the callback URL that was called (with code and state)
   const callbackUrl = new URL(redirectUri);
@@ -231,10 +227,11 @@ export async function handleCallback(
   callbackUrl.searchParams.set('state', params.state);
 
   // Exchange code for tokens using openid-client v6 API
-  console.log('[CAIA] Exchanging authorization code for tokens...');
   const metadata = config.serverMetadata();
-  console.log(`[CAIA]   Token endpoint: ${metadata.token_endpoint}`);
-  console.log(`[CAIA]   Supported auth methods: ${JSON.stringify(metadata.token_endpoint_auth_methods_supported)}`);
+  logger.info({
+    tokenEndpoint: metadata.token_endpoint,
+    supportedAuthMethods: metadata.token_endpoint_auth_methods_supported,
+  }, 'CAIA exchanging authorization code for tokens');
 
   let tokens;
   try {
@@ -244,7 +241,7 @@ export async function handleCallback(
       expectedNonce: params.nonce,
       idTokenExpected: true,
     });
-    console.log('[CAIA] Token exchange successful');
+    logger.info('CAIA token exchange successful');
   } catch (err) {
     const error = err as Error & {
       cause?: unknown;
@@ -254,53 +251,40 @@ export async function handleCallback(
       error?: string;
       error_description?: string;
     };
-    console.error('[CAIA] Token exchange FAILED:');
-    console.error(`[CAIA]   Error name: ${error.name}`);
-    console.error(`[CAIA]   Error message: ${error.message}`);
-    if (error.status) {
-      console.error(`[CAIA]   HTTP Status: ${error.status}`);
-    }
-    if (error.error) {
-      console.error(`[CAIA]   OAuth Error: ${error.error}`);
-    }
-    if (error.error_description) {
-      console.error(`[CAIA]   OAuth Error Description: ${error.error_description}`);
-    }
-    if (error.cause) {
-      console.error('[CAIA]   Error cause:', error.cause);
-    }
-    console.error('[CAIA]   Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    logger.error({
+      err: error,
+      status: error.status,
+      oauthError: error.error,
+      oauthErrorDescription: error.error_description,
+      cause: error.cause,
+    }, 'CAIA token exchange failed');
     throw err;
   }
 
   // Get claims from ID token (may only have sub)
   const idTokenClaims = tokens.claims();
   if (!idTokenClaims) {
-    console.error('[CAIA] No ID token claims in response');
+    logger.error('CAIA no ID token claims in response');
     throw new Error('No ID token claims returned');
   }
-  console.log('[CAIA] ID token claims received:', {
-    sub: idTokenClaims.sub,
-    email: idTokenClaims.email,
-    csp: idTokenClaims.csp,
-  });
+  logger.info({ sub: idTokenClaims.sub, email: idTokenClaims.email, csp: idTokenClaims.csp }, 'CAIA ID token claims received');
 
   // Fetch additional user info from userinfo endpoint
   // CAIA puts user attributes (email, name) in userinfo, not ID token
-  console.log('[CAIA] Fetching userinfo from endpoint...');
+  logger.info('CAIA fetching userinfo from endpoint');
   let userInfoClaims: Record<string, unknown> = {};
   try {
     const userInfoResponse = await client.fetchUserInfo(config, tokens.access_token, idTokenClaims.sub);
     userInfoClaims = userInfoResponse as Record<string, unknown>;
-    console.log('[CAIA] Userinfo received:', {
+    logger.info({
       sub: userInfoClaims.sub,
       email: userInfoClaims.email,
-      given_name: userInfoClaims.given_name,
-      family_name: userInfoClaims.family_name,
+      givenName: userInfoClaims.given_name,
+      familyName: userInfoClaims.family_name,
       csp: userInfoClaims.csp,
-    });
+    }, 'CAIA userinfo received');
   } catch (err) {
-    console.error('[CAIA] Failed to fetch userinfo:', err);
+    logger.error({ err }, 'CAIA failed to fetch userinfo');
     // Continue with ID token claims only - some flows may not have userinfo
   }
 
@@ -342,11 +326,12 @@ export async function validateIssuerDiscovery(
   clientSecret: string
 ): Promise<{ success: true; issuer: string }> {
   const discoveryUrl = `${issuerUrl.replace(/\/$/, '')}/.well-known/openid-configuration`;
-  console.log(`[CAIA] Validating issuer discovery:`);
-  console.log(`[CAIA]   Issuer URL: ${issuerUrl}`);
-  console.log(`[CAIA]   Discovery URL: ${discoveryUrl}`);
-  console.log(`[CAIA]   Client ID: ${clientId}`);
-  console.log(`[CAIA]   Client Secret: ${clientSecret ? '[REDACTED - ' + clientSecret.length + ' chars]' : '[EMPTY]'}`);
+  logger.info({
+    issuerUrl,
+    discoveryUrl,
+    clientId,
+    clientSecretLength: clientSecret ? clientSecret.length : 0,
+  }, 'CAIA validating issuer discovery');
 
   try {
     const config = await client.discovery(
@@ -356,7 +341,7 @@ export async function validateIssuerDiscovery(
     );
 
     const issuer = config.serverMetadata().issuer;
-    console.log(`[CAIA] Discovery successful! Issuer: ${issuer}`);
+    logger.info({ issuer }, 'CAIA discovery successful');
 
     return {
       success: true,
@@ -364,16 +349,12 @@ export async function validateIssuerDiscovery(
     };
   } catch (err) {
     const error = err as Error & { cause?: unknown; code?: string };
-    console.error(`[CAIA] Discovery FAILED for ${issuerUrl}:`);
-    console.error(`[CAIA]   Error message: ${error.message}`);
-    console.error(`[CAIA]   Error name: ${error.name}`);
-    if (error.code) {
-      console.error(`[CAIA]   Error code: ${error.code}`);
-    }
-    if (error.cause) {
-      console.error(`[CAIA]   Error cause:`, error.cause);
-    }
-    console.error(`[CAIA]   Full error:`, error);
+    logger.error({
+      err: error,
+      issuerUrl,
+      code: error.code,
+      cause: error.cause,
+    }, 'CAIA discovery failed');
     throw err;
   }
 }

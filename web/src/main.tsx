@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -23,27 +23,32 @@ import { IssuesPage } from '@/pages/Issues';
 import { ProgramsPage } from '@/pages/Programs';
 import { TeamModePage } from '@/pages/TeamMode';
 import { TeamDirectoryPage } from '@/pages/TeamDirectory';
-import { PersonEditorPage } from '@/pages/PersonEditor';
-import { FeedbackEditorPage } from '@/pages/FeedbackEditor';
 import { PublicFeedbackPage } from '@/pages/PublicFeedback';
 import { ProjectsPage } from '@/pages/Projects';
 import { DashboardPage } from '@/pages/Dashboard';
 import { MyWeekPage } from '@/pages/MyWeekPage';
-import { AdminDashboardPage } from '@/pages/AdminDashboard';
-import { AdminWorkspaceDetailPage } from '@/pages/AdminWorkspaceDetail';
 import { WorkspaceSettingsPage } from '@/pages/WorkspaceSettings';
 import { ConvertedDocumentsPage } from '@/pages/ConvertedDocuments';
-import { UnifiedDocumentPage } from '@/pages/UnifiedDocumentPage';
 import { StatusOverviewPage } from '@/pages/StatusOverviewPage';
 import { ReviewsPage } from '@/pages/ReviewsPage';
 import { OrgChartPage } from '@/pages/OrgChartPage';
 import { ReviewQueueProvider } from '@/contexts/ReviewQueueContext';
+import { NotFoundPage } from '@/pages/NotFound';
 
 import { InviteAcceptPage } from '@/pages/InviteAccept';
 import { SetupPage } from '@/pages/Setup';
 import { ToastProvider } from '@/components/ui/Toast';
 import { MutationErrorToast } from '@/components/MutationErrorToast';
 import './index.css';
+
+// Lazy-load heavy pages to reduce initial bundle size
+// Editor pages pull in TipTap, Yjs, lowlight (~400KB+ combined)
+const UnifiedDocumentPage = lazy(() => import('@/pages/UnifiedDocumentPage').then(m => ({ default: m.UnifiedDocumentPage })));
+const PersonEditorPage = lazy(() => import('@/pages/PersonEditor').then(m => ({ default: m.PersonEditorPage })));
+const FeedbackEditorPage = lazy(() => import('@/pages/FeedbackEditor').then(m => ({ default: m.FeedbackEditorPage })));
+// Admin pages are rarely accessed
+const AdminDashboardPage = lazy(() => import('@/pages/AdminDashboard').then(m => ({ default: m.AdminDashboardPage })));
+const AdminWorkspaceDetailPage = lazy(() => import('@/pages/AdminWorkspaceDetail').then(m => ({ default: m.AdminWorkspaceDetailPage })));
 
 /**
  * Redirect component for type-specific routes to canonical /documents/:id
@@ -85,6 +90,14 @@ function PlaceholderPage({ title, subtitle }: { title: string; subtitle: string 
     <div className="flex h-full flex-col items-center justify-center">
       <h1 className="text-xl font-medium text-foreground">{title}</h1>
       <p className="mt-1 text-sm text-muted">{subtitle}</p>
+    </div>
+  );
+}
+
+function LazyFallback() {
+  return (
+    <div className="flex h-full items-center justify-center">
+      <div className="text-muted text-sm">Loading...</div>
     </div>
   );
 }
@@ -177,7 +190,7 @@ function AppRoutes() {
         path="/admin"
         element={
           <SuperAdminRoute>
-            <AdminDashboardPage />
+            <Suspense fallback={<LazyFallback />}><AdminDashboardPage /></Suspense>
           </SuperAdminRoute>
         }
       />
@@ -185,7 +198,7 @@ function AppRoutes() {
         path="/admin/workspaces/:id"
         element={
           <SuperAdminRoute>
-            <AdminWorkspaceDetailPage />
+            <Suspense fallback={<LazyFallback />}><AdminWorkspaceDetailPage /></Suspense>
           </SuperAdminRoute>
         }
       />
@@ -216,7 +229,7 @@ function AppRoutes() {
         <Route path="my-week" element={<MyWeekPage />} />
         <Route path="docs" element={<DocumentsPage />} />
         <Route path="docs/:id" element={<DocumentRedirect />} />
-        <Route path="documents/:id/*" element={<UnifiedDocumentPage />} />
+        <Route path="documents/:id/*" element={<Suspense fallback={<LazyFallback />}><UnifiedDocumentPage /></Suspense>} />
         <Route path="issues" element={<IssuesPage />} />
         <Route path="issues/:id" element={<DocumentRedirect />} />
         <Route path="projects" element={<ProjectsPage />} />
@@ -239,10 +252,12 @@ function AppRoutes() {
         <Route path="team/reviews" element={<ReviewsPage />} />
         <Route path="team/org-chart" element={<OrgChartPage />} />
         {/* Person profile stays in Teams context - no redirect to /documents */}
-        <Route path="team/:id" element={<PersonEditorPage />} />
-        <Route path="feedback/:id" element={<FeedbackEditorPage />} />
+        <Route path="team/:id" element={<Suspense fallback={<LazyFallback />}><PersonEditorPage /></Suspense>} />
+        <Route path="feedback/:id" element={<Suspense fallback={<LazyFallback />}><FeedbackEditorPage /></Suspense>} />
         <Route path="settings" element={<WorkspaceSettingsPage />} />
         <Route path="settings/conversions" element={<ConvertedDocumentsPage />} />
+        {/* Catch-all: any unmatched route inside the app shell → 404 */}
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
   );

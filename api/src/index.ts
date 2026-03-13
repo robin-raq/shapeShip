@@ -10,16 +10,22 @@ const __dirname = dirname(__filename);
 config({ path: join(__dirname, '../.env.local') });
 config({ path: join(__dirname, '../.env') });
 
+// Register process-level error handlers before anything else
+import './process-handlers.js';
+
 async function main() {
-  // Load secrets from SSM in production (before importing app)
+  // Load secrets from SSM in production (before importing app).
+  // On non-AWS platforms (Railway, etc.), loadProductionSecrets() returns
+  // early when USE_SSM is not set, falling back to injected env vars.
   if (process.env.NODE_ENV === 'production') {
     const { loadProductionSecrets } = await import('./config/ssm.js');
     await loadProductionSecrets();
   }
 
-  // Now import app after secrets are loaded
+  // Now import app + logger after secrets are loaded
   const { createApp } = await import('./app.js');
   const { setupCollaboration } = await import('./collaboration/index.js');
+  const { logger } = await import('./config/logger.js');
 
   const PORT = process.env.PORT || 3000;
   const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
@@ -37,12 +43,12 @@ async function main() {
 
   // Start server
   server.listen(PORT, () => {
-    console.log(`API server running on http://localhost:${PORT}`);
-    console.log(`CORS origin: ${CORS_ORIGIN}`);
+    logger.info({ port: PORT, corsOrigin: CORS_ORIGIN }, 'API server started');
   });
 }
 
 main().catch((err) => {
+  // Use console.error here as logger may not be initialized yet
   console.error('Failed to start server:', err);
   process.exit(1);
 });

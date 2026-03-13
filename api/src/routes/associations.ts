@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
 import { z } from 'zod';
+import { logger } from '../config/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 type RouterType = ReturnType<typeof Router>;
@@ -82,7 +83,7 @@ router.get('/:id/associations', authMiddleware, async (req: Request, res: Respon
 
     return res.json(result.rows);
   } catch (error) {
-    console.error('Error fetching associations:', error);
+    logger.error({ err: error }, 'Error fetching associations');
     return res.status(500).json({ error: 'Failed to fetch associations' });
   }
 });
@@ -134,7 +135,7 @@ router.post('/:id/associations', authMiddleware, async (req: Request, res: Respo
 
     return res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error('Error creating association:', error);
+    logger.error({ err: error }, 'Error creating association');
     return res.status(500).json({ error: 'Failed to create association' });
   }
 });
@@ -177,7 +178,7 @@ router.delete('/:id/associations/:relatedId', authMiddleware, async (req: Reques
 
     return res.json({ deleted: result.rows.length, associations: result.rows });
   } catch (error) {
-    console.error('Error deleting association:', error);
+    logger.error({ err: error }, 'Error deleting association');
     return res.status(500).json({ error: 'Failed to delete association' });
   }
 });
@@ -228,7 +229,7 @@ router.get('/:id/reverse-associations', authMiddleware, async (req: Request, res
 
     return res.json(result.rows);
   } catch (error) {
-    console.error('Error fetching reverse associations:', error);
+    logger.error({ err: error }, 'Error fetching reverse associations');
     return res.status(500).json({ error: 'Failed to fetch reverse associations' });
   }
 });
@@ -399,7 +400,7 @@ router.get('/:id/context', authMiddleware, async (req: Request, res: Response) =
       breadcrumbs
     });
   } catch (error) {
-    console.error('Error fetching document context:', error);
+    logger.error({ err: error }, 'Error fetching document context');
     return res.status(500).json({ error: 'Failed to fetch document context' });
   }
 });

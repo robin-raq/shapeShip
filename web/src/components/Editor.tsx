@@ -9,7 +9,19 @@ import Link from '@tiptap/extension-link';
 import { ResizableImage } from './editor/ResizableImage';
 import Dropcursor from '@tiptap/extension-dropcursor';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import { common, createLowlight } from 'lowlight';
+import { createLowlight } from 'lowlight';
+// Import only languages relevant to a government project management tool.
+// Using explicit imports instead of `common` (36 languages) saves ~200KB.
+import javascript from 'highlight.js/lib/languages/javascript';
+import typescript from 'highlight.js/lib/languages/typescript';
+import python from 'highlight.js/lib/languages/python';
+import sql from 'highlight.js/lib/languages/sql';
+import json from 'highlight.js/lib/languages/json';
+import bash from 'highlight.js/lib/languages/bash';
+import css from 'highlight.js/lib/languages/css';
+import xml from 'highlight.js/lib/languages/xml';
+import yaml from 'highlight.js/lib/languages/yaml';
+import markdown from 'highlight.js/lib/languages/markdown';
 import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
@@ -42,8 +54,22 @@ import { useCommentsQuery, useCreateComment, useUpdateComment } from '@/hooks/us
 import { BubbleMenu } from '@tiptap/react';
 import 'tippy.js/dist/tippy.css';
 
-// Create lowlight instance with common languages
-const lowlight = createLowlight(common);
+// Create lowlight instance with only the languages Ship users need
+const lowlight = createLowlight();
+lowlight.register('javascript', javascript);
+lowlight.register('js', javascript);
+lowlight.register('typescript', typescript);
+lowlight.register('ts', typescript);
+lowlight.register('python', python);
+lowlight.register('sql', sql);
+lowlight.register('json', json);
+lowlight.register('bash', bash);
+lowlight.register('shell', bash);
+lowlight.register('css', css);
+lowlight.register('html', xml);
+lowlight.register('xml', xml);
+lowlight.register('yaml', yaml);
+lowlight.register('markdown', markdown);
 
 interface EditorProps {
   documentId: string;
@@ -290,6 +316,20 @@ export function Editor({
     // Store the updateUsers callback so we can properly remove it on cleanup
     let updateUsersCallback: (() => void) | null = null;
 
+    // Offline/online handlers — defined here so cleanup can remove them
+    const handleOffline = () => {
+      if (wsProvider) {
+        wsProvider.shouldConnect = false;
+        wsProvider.disconnect();
+      }
+    };
+    const handleOnline = () => {
+      if (wsProvider && !cancelled) {
+        wsProvider.shouldConnect = true;
+        wsProvider.connect();
+      }
+    };
+
     // Create IndexedDB persistence for content caching
     // This loads cached content BEFORE WebSocket connects for instant navigation
     const indexeddbProvider = new IndexeddbPersistence(`ship-${roomPrefix}-${documentId}`, ydoc);
@@ -368,19 +408,44 @@ export function Editor({
         connect: false,
       });
 
-      // Add raw message listener before connecting
-      // y-websocket creates its own WebSocket, we need to hook into it
+      // Add raw message listener and readyState guard before connecting.
+      // y-websocket's onmessage handler calls ws.send() without a readyState
+      // check (y-websocket.js line 187). During network flaps, the socket can
+      // receive buffered messages while in CLOSING state, causing send() to
+      // throw. We wrap send() to silently drop sends on non-OPEN sockets.
       const originalConnect = wsProvider.connect.bind(wsProvider);
       wsProvider.connect = () => {
         originalConnect();
-        // Add listener to the new WebSocket
-        if (wsProvider?.ws) {
-          wsProvider.ws.addEventListener('message', handleRawMessage);
+        const ws = wsProvider?.ws;
+        if (ws) {
+          ws.addEventListener('message', handleRawMessage);
+          // Guard ws.send against CLOSING/CLOSED state to prevent error flooding
+          const rawSend = ws.send.bind(ws);
+          ws.send = (data: string | ArrayBufferLike | Blob | ArrayBufferView) => {
+            if (ws.readyState === WebSocket.OPEN) {
+              rawSend(data);
+            }
+          };
         }
       };
 
+      // Pause reconnection while browser is offline to prevent error floods.
+      // y-websocket retries aggressively by default; this suppresses attempts
+      // until the network is back, then reconnects immediately.
+      window.addEventListener('offline', handleOffline);
+      window.addEventListener('online', handleOnline);
+
       // Now connect
       wsProvider.connect();
+
+      // Suppress connection-error noise — y-websocket emits this on every
+      // failed reconnect attempt. We handle reconnection via online/offline
+      // listeners above, so these are expected and shouldn't flood the console.
+      wsProvider.on('connection-error', (event: Event) => {
+        if (cancelled) return;
+        // Log once at debug level instead of letting the browser log as error
+        console.debug(`[Editor] WebSocket connection error for ${documentId}`, event);
+      });
 
       wsProvider.on('status', (event: { status: string }) => {
         if (cancelled) return; // Don't update state if effect was cleaned up
@@ -483,6 +548,10 @@ export function Editor({
       // Create a new AbortController for the next document
       imageUploadAbortRef.current = new AbortController();
 
+      // Remove offline/online listeners
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+
       if (wsProvider) {
         // CRITICAL: Clear awareness state before destroying to prevent ghost cursors
         // This notifies other clients that this user has left the document
@@ -496,6 +565,9 @@ export function Editor({
       }
       // Destroy IndexedDB persistence
       indexeddbProvider.destroy();
+      // Destroy Y.Doc to stop BroadcastChannel listeners from y-indexeddb
+      // Without this, old Y.Docs continue processing cross-tab messages after unmount
+      ydoc.destroy();
       // Clear provider state
       setProvider(null);
       setConnectedUsers([]);

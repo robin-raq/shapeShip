@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -87,7 +88,7 @@ router.post('/:id/iterations', authMiddleware, async (req: Request, res: Respons
       updated_at: iteration.updated_at,
     });
   } catch (err) {
-    console.error('Create iteration error:', err);
+    logger.error({ err }, 'Create iteration error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -165,7 +166,7 @@ router.get('/:id/iterations', authMiddleware, async (req: Request, res: Response
 
     res.json(iterations);
   } catch (err) {
-    console.error('Get iterations error:', err);
+    logger.error({ err }, 'Get iterations error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

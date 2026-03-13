@@ -20,33 +20,68 @@ import { spawn, ChildProcess } from 'child_process';
 import { Pool } from 'pg';
 import { readdirSync, readFileSync, existsSync } from 'fs';
 import path from 'path';
-import getPort, { portNumbers } from 'get-port';
+import net from 'net';
 import bcrypt from 'bcryptjs';
 import os from 'os';
 
 /**
- * Get port for a worker with collision avoidance.
- *
- * Each worker gets its own port range to avoid race conditions when
- * multiple workers call getPort() simultaneously. Uses a base port of 50000
- * with 100-port ranges per worker:
- * - Worker 0: 50000-50099
- * - Worker 1: 50100-50199
- * - etc.
+ * Check if a port is available by attempting to bind to it.
+ * Uses a single-interface check on 127.0.0.1 to avoid the
+ * os.networkInterfaces() call that causes uv_interface_addresses failures.
  */
-async function getWorkerPort(workerIndex: number): Promise<number> {
+function isPortAvailable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => {
+      server.close(() => resolve(true));
+    });
+    server.listen(port, '127.0.0.1');
+  });
+}
+
+/**
+ * Get port for a worker using deterministic assignment.
+ *
+ * Each worker gets a fixed port based on its index, eliminating the need
+ * for get-port's os.networkInterfaces() scan which causes uv_interface_addresses
+ * failures under concurrent load.
+ *
+ * Port layout (10 ports per worker, 2 used: API + Web):
+ * - Worker 0: 10000 (API), 10001 (Web)
+ * - Worker 1: 10010 (API), 10011 (Web)
+ * - Worker 2: 10020 (API), 10021 (Web)
+ *
+ * The offset parameter selects API (0) vs Web (1) port within the worker's range.
+ * Falls back to sequential port search if deterministic port is occupied.
+ */
+async function getWorkerPort(workerIndex: number, offset: number = 0): Promise<number> {
   const BASE_PORT = 10000;
-  const MAX_PORT = 65535;
-  const PORTS_PER_WORKER = 100;
-  const AVAILABLE_RANGE = MAX_PORT - BASE_PORT; // 55535 ports available
-  const MAX_WORKERS = Math.floor(AVAILABLE_RANGE / PORTS_PER_WORKER); // 555 workers max
+  const PORTS_PER_WORKER = 10;
 
-  // Wrap worker index to stay within valid port range
-  const wrappedIndex = workerIndex % MAX_WORKERS;
-  const startPort = BASE_PORT + wrappedIndex * PORTS_PER_WORKER;
-  const endPort = Math.min(startPort + PORTS_PER_WORKER - 1, MAX_PORT);
+  const primaryPort = BASE_PORT + workerIndex * PORTS_PER_WORKER + offset;
 
-  return getPort({ port: portNumbers(startPort, endPort) });
+  if (await isPortAvailable(primaryPort)) {
+    return primaryPort;
+  }
+
+  // Fallback: try subsequent ports in the worker's range
+  for (let i = offset + 1; i < PORTS_PER_WORKER; i++) {
+    const fallbackPort = BASE_PORT + workerIndex * PORTS_PER_WORKER + i;
+    if (await isPortAvailable(fallbackPort)) {
+      return fallbackPort;
+    }
+  }
+
+  // Last resort: search higher range
+  const emergencyBase = 30000 + workerIndex * PORTS_PER_WORKER;
+  for (let i = 0; i < PORTS_PER_WORKER; i++) {
+    if (await isPortAvailable(emergencyBase + i)) {
+      return emergencyBase + i;
+    }
+  }
+
+  throw new Error(`No available port for worker ${workerIndex} (offset ${offset})`);
 }
 
 // Get project root (fixtures is at e2e/fixtures/, so go up 2 levels)
@@ -109,6 +144,14 @@ export const test = base.extend<
     async ({}, use, workerInfo) => {
       const workerTag = `[Worker ${workerInfo.workerIndex}]`;
       const debug = process.env.DEBUG === '1';
+
+      // Stagger container startup to avoid thundering herd on Docker/port allocation
+      const staggerMs = workerInfo.workerIndex * 1000;
+      if (staggerMs > 0) {
+        if (debug) console.log(`${workerTag} Staggering startup by ${staggerMs}ms...`);
+        await new Promise(r => setTimeout(r, staggerMs));
+      }
+
       if (debug) console.log(`${workerTag} Starting PostgreSQL container...`);
 
       // Retry container startup to handle intermittent Docker port binding failures
@@ -154,8 +197,8 @@ export const test = base.extend<
     async ({ dbContainer }, use, workerInfo) => {
       const workerTag = `[Worker ${workerInfo.workerIndex}]`;
       const debug = process.env.DEBUG === '1';
-      // Use worker-specific port range to avoid collisions between parallel workers
-      const port = await getWorkerPort(workerInfo.workerIndex);
+      // Use deterministic worker-specific port (offset 0 = API port)
+      const port = await getWorkerPort(workerInfo.workerIndex, 0);
       const dbUrl = dbContainer.getConnectionUri();
 
       if (debug) console.log(`${workerTag} Starting API server on port ${port}...`);
@@ -209,8 +252,8 @@ export const test = base.extend<
     async ({ apiServer }, use, workerInfo) => {
       const workerTag = `[Worker ${workerInfo.workerIndex}]`;
       const debug = process.env.DEBUG === '1';
-      // Use worker-specific port range (separate from API port)
-      const port = await getWorkerPort(workerInfo.workerIndex);
+      // Use deterministic worker-specific port (offset 1 = Web port)
+      const port = await getWorkerPort(workerInfo.workerIndex, 1);
 
       // Extract API port from URL
       const apiPort = new URL(apiServer.url).port;
