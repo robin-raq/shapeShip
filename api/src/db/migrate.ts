@@ -11,6 +11,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { Pool } from 'pg';
 import { loadProductionSecrets } from '../config/ssm.js';
+import { logger } from '../config/logger.js';
 
 // Load .env.local for local development
 config({ path: join(dirname(fileURLToPath(import.meta.url)), '../../.env.local') });
@@ -23,7 +24,7 @@ async function migrate() {
 
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
-    console.error('ERROR: DATABASE_URL environment variable is not set');
+    logger.error('DATABASE_URL environment variable is not set');
     process.exit(1);
   }
 
@@ -33,13 +34,13 @@ async function migrate() {
   });
 
   try {
-    console.log('Running database migrations...');
+    logger.info('Running database migrations');
 
     // Step 1: Run schema.sql for initial setup
     const schemaPath = join(__dirname, 'schema.sql');
     const schema = readFileSync(schemaPath, 'utf-8');
     await pool.query(schema);
-    console.log('✅ Schema applied');
+    logger.info('Schema applied');
 
     // Step 2: Create migrations tracking table
     await pool.query(`
@@ -62,7 +63,7 @@ async function migrate() {
         .filter(f => f.endsWith('.sql'))
         .sort(); // Ensures numeric order: 001_, 002_, etc.
     } catch {
-      console.log('ℹ️  No migrations directory found');
+      logger.info('No migrations directory found');
     }
 
     let migrationsRun = 0;
@@ -73,7 +74,7 @@ async function migrate() {
         continue; // Already applied
       }
 
-      console.log(`  Running migration: ${file}`);
+      logger.info({ file }, 'Running migration');
       const migrationPath = join(migrationsDir, file);
       const migrationSql = readFileSync(migrationPath, 'utf-8');
 
@@ -84,7 +85,7 @@ async function migrate() {
         await client.query(migrationSql);
         await client.query('INSERT INTO schema_migrations (version) VALUES ($1)', [version]);
         await client.query('COMMIT');
-        console.log(`  ✅ ${file} applied`);
+        logger.info({ file }, 'Migration applied');
         migrationsRun++;
       } catch (err) {
         await client.query('ROLLBACK');
@@ -95,18 +96,18 @@ async function migrate() {
     }
 
     if (migrationsRun === 0) {
-      console.log('✅ All migrations already applied');
+      logger.info('All migrations already applied');
     } else {
-      console.log(`✅ ${migrationsRun} migration(s) applied successfully`);
+      logger.info({ count: migrationsRun }, 'Migrations applied successfully');
     }
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     // "already exists" errors from schema.sql are fine
     if (errorMessage.includes('already exists')) {
-      console.log('Database schema already exists, continuing...');
+      logger.info('Database schema already exists, continuing');
     } else {
-      console.error('Database migration failed:', error);
+      logger.error({ err: error }, 'Database migration failed');
       process.exit(1);
     }
   } finally {

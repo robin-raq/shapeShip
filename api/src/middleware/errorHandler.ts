@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { logger } from '../config/logger.js';
 
 /**
  * Global Express error-handling middleware.
@@ -40,7 +41,7 @@ export function errorHandler(
     message = err.message || 'Not found';
   } else if (status >= 500) {
     // Log server errors — these indicate real bugs
-    console.error('[ErrorHandler]', err.message, err.stack);
+    logger.error({ err, status }, 'Unhandled server error');
   }
 
   res.status(status).json({

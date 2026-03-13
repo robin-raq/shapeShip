@@ -5,6 +5,7 @@ import { readFileSync } from 'fs';
 import pg from 'pg';
 import bcrypt from 'bcryptjs';
 import { loadProductionSecrets } from '../config/ssm.js';
+import { logger } from '../config/logger.js';
 import { WELCOME_DOCUMENT_TITLE, WELCOME_DOCUMENT_CONTENT } from './welcomeDocument.js';
 
 const { Pool } = pg;
@@ -1248,7 +1249,7 @@ async function seed() {
     console.log('  Email: dev@ship.local');
     console.log('  Password: admin123');
   } catch (error) {
-    console.error('❌ Seed failed:', error);
+    logger.error({ err: error }, 'Seed failed');
     process.exit(1);
   } finally {
     await pool.end();

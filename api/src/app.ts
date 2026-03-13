@@ -38,6 +38,9 @@ import { documentCommentsRouter, commentsRouter } from './routes/comments.js';
 import { setupSwagger } from './swagger.js';
 import { initializeCAIA } from './services/caia.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { logger } from './config/logger.js';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 
 // Validate SESSION_SECRET in production
 if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
@@ -145,6 +148,14 @@ export function createApp(corsOrigin: string = 'http://localhost:5173'): express
   app.use(express.json({ limit: '10mb' }));  // Large wiki documents can be several MB
   app.use(express.urlencoded({ extended: true, limit: '10mb' })); // For HTML form submissions
   app.use(cookieParser(sessionSecret));
+
+  // Structured HTTP request logging via pino-http
+  // Skip in test mode to keep test output clean (logger level is 'silent' anyway)
+  if (process.env.NODE_ENV !== 'test') {
+    // pino-http uses CJS-style exports; createRequire bridges the ESM/CJS gap
+    const pinoHttp = require('pino-http');
+    app.use(pinoHttp({ logger, autoLogging: true }));
+  }
 
   // Session middleware for CSRF token storage
   app.use(session({

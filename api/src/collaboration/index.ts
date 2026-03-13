@@ -6,6 +6,7 @@ import * as awarenessProtocol from 'y-protocols/awareness';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { pool } from '../db/client.js';
+import { logger } from '../config/logger.js';
 import { extractHypothesisFromContent, extractSuccessCriteriaFromContent, extractVisionFromContent, extractGoalsFromContent } from '../utils/extractHypothesis.js';
 import { yjsToJson, jsonToYjs } from '../utils/yjsConverter.js';
 import { SESSION_TIMEOUT_MS, ABSOLUTE_SESSION_TIMEOUT_MS } from '@ship/shared';
@@ -174,7 +175,7 @@ async function persistDocument(docName: string, doc: Y.Doc) {
       [Buffer.from(state), JSON.stringify(content), JSON.stringify(updatedProps), docId]
     );
   } catch (err) {
-    console.error('Failed to persist document:', err);
+    logger.error({ err, docName }, 'Failed to persist document');
   }
 }
 
@@ -788,7 +789,7 @@ export function setupCollaboration(server: Server) {
   // Handle events WebSocket connections (for real-time notifications)
   eventsWss.on('connection', (ws: WebSocket, sessionData: { userId: string; workspaceId: string }) => {
     eventConns.set(ws, { userId: sessionData.userId, workspaceId: sessionData.workspaceId });
-    console.log(`[Events] User ${sessionData.userId} connected (${eventConns.size} total connections)`);
+    logger.info({ userId: sessionData.userId, totalConnections: eventConns.size }, 'Events user connected');
 
     // Send initial connected message
     ws.send(JSON.stringify({ type: 'connected', data: {} }));
@@ -825,10 +826,10 @@ export function setupCollaboration(server: Server) {
       eventConns.delete(ws);
       rateLimitViolations.delete(ws);
       messageTimestamps.delete(ws);
-      console.log(`[Events] User ${sessionData.userId} disconnected (${eventConns.size} total connections)`);
+      logger.info({ userId: sessionData.userId, totalConnections: eventConns.size }, 'Events user disconnected');
     });
   });
 
-  console.log('Yjs collaboration server attached');
-  console.log('Events WebSocket server attached');
+  logger.info('Yjs collaboration server attached');
+  logger.info('Events WebSocket server attached');
 }
