@@ -1,78 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ContextMenu, ContextMenuItem } from '@/components/ui/ContextMenu';
 import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/lib/cn';
-
-const API_URL = import.meta.env.VITE_API_URL ?? '';
-
-interface Backlink {
-  id: string;
-  document_type: string;
-  title: string;
-  display_id?: string;
-}
+import { useBacklinksQuery, type Backlink } from '@/hooks/useBacklinksQuery';
 
 interface BacklinksPanelProps {
   documentId: string;
 }
 
 export function BacklinksPanel({ documentId }: BacklinksPanelProps) {
-  const [backlinks, setBacklinks] = useState<Backlink[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: backlinks = [], isLoading, error } = useBacklinksQuery(documentId);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; backlink: Backlink } | null>(null);
   const navigate = useNavigate();
   const { showToast } = useToast();
-
-  useEffect(() => {
-    if (!documentId) return;
-
-    let cancelled = false;
-
-    async function fetchBacklinks() {
-      try {
-        // Only show loading on initial fetch, not on polls
-        if (backlinks.length === 0) {
-          setLoading(true);
-        }
-        setError(null);
-
-        const response = await fetch(`${API_URL}/api/documents/${documentId}/backlinks`, {
-          credentials: 'include',
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch backlinks');
-        }
-
-        const data = await response.json();
-
-        if (!cancelled) {
-          setBacklinks(data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('Error fetching backlinks:', err);
-          setError('Failed to load backlinks');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    fetchBacklinks();
-
-    // Poll for updates every 5 seconds (for real-time backlink updates)
-    const intervalId = setInterval(fetchBacklinks, 5000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(intervalId);
-    };
-  }, [documentId]);
 
   const getDocumentUrl = (backlink: Backlink): string => {
     // Get the path based on document type
@@ -154,7 +95,7 @@ export function BacklinksPanel({ documentId }: BacklinksPanelProps) {
     return labels[type] || type;
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-2 p-4">
         <h3 className="text-xs font-medium text-muted">Backlinks</h3>
@@ -167,7 +108,7 @@ export function BacklinksPanel({ documentId }: BacklinksPanelProps) {
     return (
       <div className="space-y-2 p-4">
         <h3 className="text-xs font-medium text-muted">Backlinks</h3>
-        <div className="text-xs text-red-500">{error}</div>
+        <div className="text-xs text-red-500">{error.message}</div>
       </div>
     );
   }
