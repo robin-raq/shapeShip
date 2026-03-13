@@ -84,9 +84,12 @@ const loginLimiter = rateLimit({
 });
 
 // General API rate limit (100 req/min in prod, 1000 in dev)
+const apiRateMax = process.env.RATE_LIMIT_MAX
+  ? parseInt(process.env.RATE_LIMIT_MAX, 10)
+  : isTestEnv ? 10000 : isDevEnv ? 1000 : 100;
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: isTestEnv ? 10000 : isDevEnv ? 1000 : 100, // High limit for tests/dev
+  max: apiRateMax, // Configurable via RATE_LIMIT_MAX env var
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Please slow down.' },
