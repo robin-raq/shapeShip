@@ -125,3 +125,6 @@ Codebase_Orientation_Checklist.pdf
 
 # Test coverage output
 api/coverage/
+
+# Benchmark results (machine-specific, regenerate with: node api/benchmarks/latency.mjs)
+api/benchmarks/results.json
