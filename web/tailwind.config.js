@@ -10,8 +10,10 @@ export default {
         foreground: '#f5f5f5',
         muted: '#8a8a8a', // 5.1:1 contrast on background
         border: '#262626',
-        accent: '#2e8bc9', // USWDS blue lightened for dark bg (5.21:1 contrast)
-        'accent-hover': '#3d97d3', // Hover variant (6.12:1 contrast)
+        accent: '#2e8bc9', // USWDS blue lightened for dark bg (5.21:1 contrast on #0d0d0d)
+        'accent-hover': '#3d97d3', // Hover variant (6.12:1 contrast on #0d0d0d)
+        'accent-bold': '#1e73aa', // Darker variant for bg-accent + text-white buttons (5.14:1 contrast)
+        'accent-bold-hover': '#2680b5', // Hover for bold variant (4.58:1 contrast)
       },
       fontFamily: {
         sans: [

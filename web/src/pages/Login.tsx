@@ -178,7 +178,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <main className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-[360px]">
         {/* Logo / Brand */}
         <div className="mb-8 text-center">
@@ -286,8 +286,8 @@ export function LoginPage() {
             type="submit"
             disabled={isLoading}
             className={cn(
-              'w-full rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-white',
-              'transition-colors hover:bg-accent-hover',
+              'w-full rounded-md bg-accent-bold px-4 py-2.5 text-sm font-medium text-white',
+              'transition-colors hover:bg-accent-bold-hover',
               'focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-background',
               'disabled:cursor-not-allowed disabled:opacity-50'
             )}
@@ -367,6 +367,6 @@ export function LoginPage() {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }
