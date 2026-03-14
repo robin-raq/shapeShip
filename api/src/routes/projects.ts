@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { pool } from '../db/client.js';
+import { pool, queryRows } from '../db/client.js';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
@@ -409,8 +409,8 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 
     query += ` ORDER BY ${orderByClause}`;
 
-    const result = await pool.query(query, params);
-    res.json(result.rows.map(extractProjectFromRow));
+    const projects = await queryRows<ProjectQueryRow>(query, params);
+    res.json(projects.map(extractProjectFromRow));
   } catch (err) {
     logger.error({ err }, 'List projects error');
     res.status(500).json({ error: 'Internal server error' });

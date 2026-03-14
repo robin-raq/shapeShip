@@ -3,6 +3,7 @@ import { config } from 'dotenv';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { logger } from '../config/logger.js';
+import type { QueryParam } from '../types/db-rows.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -40,5 +41,23 @@ process.on('SIGINT', async () => {
   logger.info('Database pool closed');
   process.exit(0);
 });
+
+/**
+ * Type-safe single-row query. Returns the first row typed as T, or null.
+ * Uses pg's built-in generic support: pool.query<T>() → QueryResult<T>.
+ */
+export async function queryRow<T extends pg.QueryResultRow>(sql: string, params: QueryParam[]): Promise<T | null> {
+  const result = await pool.query<T>(sql, params);
+  return result.rows[0] ?? null;
+}
+
+/**
+ * Type-safe multi-row query. Returns all rows typed as T[].
+ * Uses pg's built-in generic support: pool.query<T>() → QueryResult<T>.
+ */
+export async function queryRows<T extends pg.QueryResultRow>(sql: string, params: QueryParam[]): Promise<T[]> {
+  const result = await pool.query<T>(sql, params);
+  return result.rows;
+}
 
 export { pool };

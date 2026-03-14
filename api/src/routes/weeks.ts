@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { pool } from '../db/client.js';
+import { pool, queryRow, queryRows } from '../db/client.js';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
@@ -12,6 +12,7 @@ import {
 import { logDocumentChange, getLatestDocumentFieldHistory } from '../utils/document-crud.js';
 import { broadcastToUser } from '../collaboration/index.js';
 import { extractText } from '../utils/document-content.js';
+import { pgBool } from '../types/db-rows.js';
 import type { QueryParam, SprintQueryRow, StandupQueryRow, IssueStateRow, GroupedIssue, TipTapNode, SprintReviewData, ReviewIssueRow } from '../types/db-rows.js';
 
 type RouterType = ReturnType<typeof Router>;
@@ -96,11 +97,10 @@ const SPRINT_DETAIL_CTE_SQL = `
 
 /** Re-query a single sprint by ID with full CTE-based aggregation */
 async function querySprintById(sprintId: string): Promise<SprintQueryRow | null> {
-  const result = await pool.query(
+  return queryRow<SprintQueryRow>(
     `${SPRINT_DETAIL_CTE_SQL} WHERE d.id = $1 AND d.document_type = 'sprint'`,
     [sprintId]
   );
-  return result.rows[0] || null;
 }
 
 /**
@@ -273,8 +273,8 @@ function extractSprintFromRow(row: SprintQueryRow) {
     issue_count: parseInt(row.issue_count) || 0,
     completed_count: parseInt(row.completed_count) || 0,
     started_count: parseInt(row.started_count) || 0,
-    has_plan: row.has_plan === true,
-    has_retro: row.has_retro === true,
+    has_plan: pgBool(row.has_plan),
+    has_retro: pgBool(row.has_retro),
     // Retro outcome summary (populated if retro exists)
     retro_outcome: row.retro_outcome || null,
     retro_id: row.retro_id || null,
@@ -331,13 +331,13 @@ function isSprintActive(sprintNumber: number, workspaceStartDate: Date | string)
 
 // Take a snapshot of current issues in the sprint
 async function takeSprintSnapshot(sprintId: string): Promise<string[]> {
-  const result = await pool.query(
+  const rows = await queryRows<{ id: string }>(
     `SELECT d.id FROM documents d
      JOIN document_associations da ON da.document_id = d.id
      WHERE da.related_id = $1 AND da.relationship_type = 'sprint' AND d.document_type = 'issue'`,
     [sprintId]
   );
-  return result.rows.map(row => row.id);
+  return rows.map(row => row.id);
 }
 
 // Get all active sprints across the workspace
@@ -548,8 +548,8 @@ router.get('/my-action-items', authMiddleware, async (req: Request, res: Respons
 
     for (const row of result.rows) {
       const sprintNumber = parseInt(row.sprint_number, 10);
-      const hasPlan = row.has_plan === true || row.has_plan === 't';
-      const hasRetro = row.has_retro === true || row.has_retro === 't';
+      const hasPlan = pgBool(row.has_plan);
+      const hasRetro = pgBool(row.has_retro);
 
       // Calculate sprint dates
       const sprintStart = new Date(workspaceStartDate);

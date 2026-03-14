@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../db/client.js';
+import { pgBool } from '../types/db-rows.js';
 import { logger } from '../config/logger.js';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -2107,9 +2108,9 @@ router.get('/accountability-grid', authMiddleware, async (req: Request, res: Res
       sprintAccountability[sprintNumber] = {
         id: sprint.id,
         title: sprint.title,
-        hasPlan: sprint.has_plan === true || sprint.has_plan === 't',
+        hasPlan: pgBool(sprint.has_plan),
         planApproval: sprint.plan_approval,
-        hasReview: sprint.has_review === true,
+        hasReview: pgBool(sprint.has_review),
         reviewApproval: sprint.review_approval,
       };
     }
@@ -2175,7 +2176,7 @@ router.get('/accountability-grid', authMiddleware, async (req: Request, res: Res
         programEmoji: p.program_emoji,
         hasPlan,
         planApproval: p.plan_approval,
-        hasRetro: p.has_retro === true,
+        hasRetro: pgBool(p.has_retro),
         retroApproval: p.retro_approval,
         allocations: projectAllocations[p.id] || {},
       };

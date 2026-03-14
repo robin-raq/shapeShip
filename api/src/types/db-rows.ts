@@ -22,6 +22,21 @@
 export type QueryParam = string | number | boolean | null;
 
 // ---------------------------------------------------------------------------
+// Utility functions
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalize a PostgreSQL boolean value to a JavaScript boolean.
+ *
+ * pg v7+ returns native `boolean` for SQL BOOLEAN columns, but older drivers
+ * or raw COALESCE/string aggregations may return 't'/'f'. This centralizes
+ * the check so call sites don't need defensive `=== true || === 't'` patterns.
+ */
+export function pgBool(value: unknown): boolean {
+  return value === true || value === 't';
+}
+
+// ---------------------------------------------------------------------------
 // TipTap content
 // ---------------------------------------------------------------------------
 

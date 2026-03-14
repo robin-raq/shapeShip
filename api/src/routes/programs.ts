@@ -1,9 +1,10 @@
 import { Router, Request, Response } from 'express';
-import { pool } from '../db/client.js';
+import { pool, queryRows } from '../db/client.js';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { pgBool } from '../types/db-rows.js';
 import type { QueryParam, ProgramQueryRow } from '../types/db-rows.js';
 import { logAuditEvent } from '../services/audit.js';
 
@@ -93,8 +94,8 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 
     query += ` ORDER BY d.created_at DESC`;
 
-    const result = await pool.query(query, params);
-    res.json(result.rows.map(extractProgramFromRow));
+    const programs = await queryRows<ProgramQueryRow>(query, params);
+    res.json(programs.map(extractProgramFromRow));
   } catch (err) {
     logger.error({ err }, 'List programs error');
     res.status(500).json({ error: 'Internal server error' });
@@ -590,8 +591,8 @@ router.get('/:id/sprints', authMiddleware, async (req: Request, res: Response) =
         completed_count: parseInt(row.completed_count) || 0,
         started_count: parseInt(row.started_count) || 0,
         total_estimate_hours: parseFloat(row.total_estimate_hours) || 0,
-        has_plan: row.has_plan === true || row.has_plan === 't',
-        has_retro: row.has_retro === true || row.has_retro === 't',
+        has_plan: pgBool(row.has_plan),
+        has_retro: pgBool(row.has_retro),
         plan_created_at: row.plan_created_at || null,
         retro_created_at: row.retro_created_at || null,
         // Plan tracking - what will we learn/validate?
