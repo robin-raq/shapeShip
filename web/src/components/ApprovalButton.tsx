@@ -1,8 +1,12 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, lazy, Suspense } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import type { ApprovalTracking } from '@ship/shared';
-import { DiffViewer, tipTapToPlainText } from '@/components/DiffViewer';
+import { tipTapToPlainText } from '@/lib/tiptap-text';
 import { apiPost } from '@/lib/api';
+
+// Lazy-load DiffViewer to keep diff-match-patch (~30KB) out of the main bundle.
+// The diff dialog is rarely opened (only in "changed_since_approved" state).
+const DiffViewer = lazy(() => import('@/components/DiffViewer'));
 
 // Inline SVG icons
 function CheckCircleIcon({ className }: { className?: string }) {
@@ -224,11 +228,13 @@ export function ApprovalButton({
               <p className="text-sm text-muted mb-4">
                 Previously approved by {approverName || 'Admin'} on {formatDate(approvedAt)}
               </p>
-              <DiffViewer
-                oldContent={getContentString(approvedContent)}
-                newContent={getContentString(currentContent)}
-                className="p-4 rounded-lg bg-muted/30 border border-border"
-              />
+              <Suspense fallback={<div className="p-4 text-sm text-muted">Loading diff...</div>}>
+                <DiffViewer
+                  oldContent={getContentString(approvedContent)}
+                  newContent={getContentString(currentContent)}
+                  className="p-4 rounded-lg bg-muted/30 border border-border"
+                />
+              </Suspense>
             </Dialog.Content>
           </Dialog.Portal>
         </Dialog.Root>

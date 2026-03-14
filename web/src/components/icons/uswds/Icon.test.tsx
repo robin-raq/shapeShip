@@ -1,32 +1,31 @@
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import { isValidIconName, ICON_NAMES } from './types';
 
-// Test the types module separately since the Icon component requires dynamic imports
-// that are difficult to mock in vitest
-
 describe('Icon types module', () => {
-  it('exports IconName type with at least 100 icons', () => {
-    expect(ICON_NAMES.length).toBeGreaterThanOrEqual(100);
+  it('exports only the icons actually used in the app', () => {
+    // We only ship icons that are referenced in source code
+    // This prevents bundling 245 unused USWDS icon chunks
+    expect(ICON_NAMES).toEqual(['check', 'close', 'info', 'warning']);
   });
 
-  it('includes common USWDS icons', () => {
-    const commonIcons = ['check', 'close', 'warning', 'info', 'search', 'arrow_back'];
-    commonIcons.forEach((iconName) => {
-      expect(ICON_NAMES).toContain(iconName);
-    });
-  });
-
-  it('isValidIconName returns true for valid icons', () => {
+  it('isValidIconName returns true for used icons', () => {
     expect(isValidIconName('check')).toBe(true);
     expect(isValidIconName('close')).toBe(true);
     expect(isValidIconName('warning')).toBe(true);
+    expect(isValidIconName('info')).toBe(true);
+  });
+
+  it('isValidIconName returns false for unused USWDS icons', () => {
+    // These exist in the USWDS library but are not used in Ship
+    expect(isValidIconName('search')).toBe(false);
+    expect(isValidIconName('arrow_back')).toBe(false);
+    expect(isValidIconName('home')).toBe(false);
   });
 
   it('isValidIconName returns false for invalid icons', () => {
     expect(isValidIconName('not-a-real-icon')).toBe(false);
     expect(isValidIconName('')).toBe(false);
-    expect(isValidIconName('random-string-123')).toBe(false);
   });
 
   it('all ICON_NAMES pass validation', () => {
@@ -36,20 +35,8 @@ describe('Icon types module', () => {
   });
 });
 
-// Test the Icon component's behavior without testing the actual SVG loading
-// These tests use unit test patterns that don't require lazy loading
-
 describe('Icon component behavior', () => {
-  // Import Icon dynamically to avoid module resolution issues
-  let Icon: typeof import('./Icon').Icon;
-
-  beforeEach(async () => {
-    // Reset modules to get a fresh Icon component
-    vi.resetModules();
-  });
-
   it('exports Icon component from index', async () => {
-    // Test that the exports are correct
     const { Icon: ExportedIcon } = await import('./index');
     expect(ExportedIcon).toBeDefined();
     expect(typeof ExportedIcon).toBe('function');
@@ -72,24 +59,5 @@ describe('Icon component behavior', () => {
     );
 
     consoleSpy.mockRestore();
-  });
-});
-
-// Test IconProps interface indirectly through TypeScript
-describe('IconProps interface', () => {
-  it('requires name prop', () => {
-    // This is a compile-time check - if it compiles, the test passes
-    // The Icon component signature requires name: IconName
-    expect(true).toBe(true);
-  });
-
-  it('className is optional', () => {
-    // This is a compile-time check
-    expect(true).toBe(true);
-  });
-
-  it('title is optional', () => {
-    // This is a compile-time check
-    expect(true).toBe(true);
   });
 });

@@ -18,31 +18,33 @@ export interface IconProps {
 
 type SvgComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
-// Use Vite's glob import to get all USWDS icons as lazy-loadable modules
-// This works because glob imports are resolved at build time
-const iconModules = import.meta.glob<{ default: SvgComponent }>(
-  '/node_modules/@uswds/uswds/dist/img/usa-icons/*.svg',
-  { query: '?react' },
-);
-
-// Build a map from icon name to its loader function
-const iconLoaders = new Map<string, () => Promise<{ default: SvgComponent }>>();
-for (const [path, loader] of Object.entries(iconModules)) {
-  // Extract icon name from path: /node_modules/@uswds/uswds/dist/img/usa-icons/check.svg -> check
-  const name = path.split('/').pop()?.replace('.svg', '');
-
-  if (name) {
-    iconLoaders.set(name, loader);
-  }
-}
+/**
+ * Static icon loaders — only the icons actually used in the app.
+ *
+ * Previously used import.meta.glob() which created a JS chunk for every
+ * USWDS icon (245 chunks, ~99KB). Since we only use 4 icons, static
+ * dynamic imports eliminate 241 unnecessary chunks from the build output.
+ *
+ * To add a new icon:
+ * 1. Add the name to types.ts (IconName union + ICON_NAMES array)
+ * 2. Add a lazy import entry here
+ */
+// Use /node_modules/ filesystem path (not package specifier) to bypass
+// @uswds/uswds exports map which doesn't expose individual SVG files.
+const iconLoaders: Record<string, () => Promise<{ default: SvgComponent }>> = {
+  check: () => import('/node_modules/@uswds/uswds/dist/img/usa-icons/check.svg?react'),
+  close: () => import('/node_modules/@uswds/uswds/dist/img/usa-icons/close.svg?react'),
+  info: () => import('/node_modules/@uswds/uswds/dist/img/usa-icons/info.svg?react'),
+  warning: () => import('/node_modules/@uswds/uswds/dist/img/usa-icons/warning.svg?react'),
+};
 
 // Cache for lazy-loaded icon components
 const iconCache = new Map<string, ReturnType<typeof lazy<SvgComponent>>>();
 
-// Get or create a lazy-loaded icon component
+/** Get or create a lazy-loaded icon component */
 function getLazyIcon(name: string) {
   if (!iconCache.has(name)) {
-    const loader = iconLoaders.get(name);
+    const loader = iconLoaders[name];
     if (!loader) return null;
 
     const LazyIcon = lazy<SvgComponent>(loader);
@@ -91,11 +93,11 @@ export function Icon({
   // Memoize the lazy icon component lookup
   const LazyIcon = useMemo(() => getLazyIcon(name), [name]);
 
-  // Handle case where icon loader wasn't found (shouldn't happen if types are in sync)
+  // Handle case where icon loader wasn't found
   if (!LazyIcon) {
     if (process.env.NODE_ENV !== 'production') {
       console.warn(
-        `Icon: Could not load icon "${name}". Icon may not be available.`,
+        `Icon: Could not load icon "${name}". Add it to iconLoaders in Icon.tsx.`,
       );
     }
 
@@ -103,8 +105,6 @@ export function Icon({
   }
 
   // Accessibility attributes following USWDS patterns
-  // Note: SVGR-generated components don't forward children, so we use
-  // aria-label instead of aria-labelledby + <title> child element.
   const accessibilityProps = title
     ? {
         role: 'img' as const,
