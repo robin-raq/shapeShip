@@ -36,6 +36,20 @@ export function pgBool(value: unknown): boolean {
   return value === true || value === 't';
 }
 
+/**
+ * Narrow nullable JSONB properties to their concrete type.
+ *
+ * Replaces the common `row.properties || {}` pattern which widens
+ * the type to `T | {}`, losing property autocompletion. This function
+ * uses ?? (nullish coalescing) and preserves the generic T throughout.
+ */
+export function narrowProperties<T>(
+  properties: T | null | undefined,
+  defaults: T
+): T {
+  return properties ?? defaults;
+}
+
 // ---------------------------------------------------------------------------
 // TipTap content
 // ---------------------------------------------------------------------------
@@ -136,6 +150,16 @@ export type DocumentProperties =
   | ProgramProperties
   | Record<string, unknown>
   | null;
+
+// ---------------------------------------------------------------------------
+// Default property values for narrowProperties()
+// ---------------------------------------------------------------------------
+
+/** Empty defaults for narrowProperties() — use when properties is null */
+export const EMPTY_SPRINT_PROPS: SprintProperties = {};
+export const EMPTY_ISSUE_PROPS: IssueProperties = {};
+export const EMPTY_PROJECT_PROPS: ProjectProperties = {};
+export const EMPTY_PROGRAM_PROPS: ProgramProperties = {};
 
 // ---------------------------------------------------------------------------
 // Query row types — each matches EXACTLY what its SQL SELECT returns

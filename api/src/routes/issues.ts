@@ -13,6 +13,7 @@ import {
   type BelongsToEntry,
 } from '../utils/document-crud.js';
 import { broadcastToUser } from '../collaboration/index.js';
+import { narrowProperties, EMPTY_ISSUE_PROPS } from '../types/db-rows.js';
 import type { QueryParam, IssueQueryRow } from '../types/db-rows.js';
 
 type RouterType = ReturnType<typeof Router>;
@@ -82,7 +83,7 @@ const rejectIssueSchema = z.object({
 
 // Helper to extract issue properties from row (without belongs_to - added separately)
 function extractIssueFromRow(row: IssueQueryRow) {
-  const props = row.properties || {};
+  const props = narrowProperties(row.properties, EMPTY_ISSUE_PROPS);
   return {
     id: row.id,
     title: row.title,

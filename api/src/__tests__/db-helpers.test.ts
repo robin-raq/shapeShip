@@ -127,3 +127,37 @@ describe('pgBool', () => {
     expect(pgBool('true')).toBe(false); // only 't' is truthy, not 'true'
   });
 });
+
+// ---------------------------------------------------------------------------
+// narrowProperties — type-safe JSONB properties narrowing
+// ---------------------------------------------------------------------------
+import { narrowProperties, EMPTY_SPRINT_PROPS, EMPTY_PROJECT_PROPS } from '../types/db-rows.js';
+import type { SprintProperties, ProjectProperties } from '../types/db-rows.js';
+
+describe('narrowProperties', () => {
+  it('returns properties when not null', () => {
+    const props: SprintProperties = { sprint_number: 5, status: 'active' };
+    const result = narrowProperties(props, EMPTY_SPRINT_PROPS);
+
+    expect(result.sprint_number).toBe(5);
+    expect(result.status).toBe('active');
+  });
+
+  it('returns defaults when properties is null', () => {
+    const result = narrowProperties(null, EMPTY_SPRINT_PROPS);
+
+    expect(result).toEqual({});
+    // Key: result is typed as SprintProperties, not {} | SprintProperties
+    expect(result.sprint_number).toBeUndefined();
+  });
+
+  it('preserves the generic type (TypeScript compile-time check)', () => {
+    const props: ProjectProperties = { impact: 5, confidence: 4, ease: 3 };
+    const result = narrowProperties(props, EMPTY_PROJECT_PROPS);
+
+    // TypeScript knows result is ProjectProperties, not a union
+    expect(result.impact).toBe(5);
+    expect(result.confidence).toBe(4);
+    expect(result.ease).toBe(3);
+  });
+});

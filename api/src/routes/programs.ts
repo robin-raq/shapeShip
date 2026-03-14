@@ -4,7 +4,7 @@ import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { pgBool } from '../types/db-rows.js';
+import { pgBool, narrowProperties, EMPTY_PROGRAM_PROPS } from '../types/db-rows.js';
 import type { QueryParam, ProgramQueryRow } from '../types/db-rows.js';
 import { logAuditEvent } from '../services/audit.js';
 
@@ -13,7 +13,7 @@ const router: RouterType = Router();
 
 // Helper to extract program from row
 function extractProgramFromRow(row: ProgramQueryRow) {
-  const props = row.properties || {};
+  const props = narrowProperties(row.properties, EMPTY_PROGRAM_PROPS);
   return {
     id: row.id,
     name: row.title,

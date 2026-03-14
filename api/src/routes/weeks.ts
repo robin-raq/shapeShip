@@ -12,7 +12,7 @@ import {
 import { logDocumentChange, getLatestDocumentFieldHistory } from '../utils/document-crud.js';
 import { broadcastToUser } from '../collaboration/index.js';
 import { extractText } from '../utils/document-content.js';
-import { pgBool } from '../types/db-rows.js';
+import { pgBool, narrowProperties, EMPTY_SPRINT_PROPS } from '../types/db-rows.js';
 import type { QueryParam, SprintQueryRow, StandupQueryRow, IssueStateRow, GroupedIssue, TipTapNode, SprintReviewData, ReviewIssueRow } from '../types/db-rows.js';
 
 type RouterType = ReturnType<typeof Router>;
@@ -253,7 +253,7 @@ const updatePlanSchema = z.object({
 // Helper to extract sprint from row
 // Dates and status are computed on frontend from sprint_number + workspace.sprint_start_date
 function extractSprintFromRow(row: SprintQueryRow) {
-  const props = row.properties || {};
+  const props = narrowProperties(row.properties, EMPTY_SPRINT_PROPS);
   return {
     id: row.id,
     name: row.title,

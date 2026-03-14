@@ -27,7 +27,7 @@ const rejectFeedbackSchema = z.object({
 
 // Helper to extract feedback from row
 function extractFeedbackFromRow(row: FeedbackQueryRow, programPrefix?: string | null) {
-  const props = row.properties || {};
+  const props = row.properties ?? {};
   return {
     id: row.id,
     title: row.title,

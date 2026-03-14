@@ -8,6 +8,7 @@ import { DEFAULT_PROJECT_PROPERTIES, computeICEScore } from '@ship/shared';
 import { checkDocumentCompleteness } from '../utils/extractHypothesis.js';
 import { logDocumentChange, getLatestDocumentFieldHistory } from '../utils/document-crud.js';
 import { broadcastToUser } from '../collaboration/index.js';
+import { narrowProperties, EMPTY_PROJECT_PROPS } from '../types/db-rows.js';
 import type { QueryParam, ProjectQueryRow, SprintQueryRow, IssueStateRow, TipTapNode } from '../types/db-rows.js';
 
 type RouterType = ReturnType<typeof Router>;
@@ -18,7 +19,7 @@ type InferredProjectStatus = 'active' | 'planned' | 'completed' | 'backlog' | 'a
 
 // Helper to extract project from row with computed ice_score
 function extractProjectFromRow(row: ProjectQueryRow) {
-  const props = row.properties || {};
+  const props = narrowProperties(row.properties, EMPTY_PROJECT_PROPS);
   const impact = props.impact ?? null;
   const confidence = props.confidence ?? null;
   const ease = props.ease ?? null;
