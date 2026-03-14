@@ -16,10 +16,12 @@
 
 /**
  * SQL query parameter — types the pg driver accepts for parameterized queries.
+ *
+ * Includes string[] for SQL ANY() operator (e.g., `WHERE state = ANY($1)`).
  * NOTE: pg silently converts undefined→null, but we exclude it to prevent
  * accidental null insertion when the developer meant "not provided".
  */
-export type QueryParam = string | number | boolean | null;
+export type QueryParam = string | number | boolean | string[] | null;
 
 // ---------------------------------------------------------------------------
 // Utility functions

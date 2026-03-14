@@ -139,7 +139,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       WHERE d.workspace_id = $1 AND d.document_type = 'issue'
         AND ${VISIBILITY_FILTER_SQL('d', '$2', '$3')}
     `;
-    const params: (string | boolean | null)[] = [workspaceId, userId, isAdmin];
+    const params: QueryParam[] = [workspaceId, userId, isAdmin];
 
     // Exclude archived and deleted issues by default
     query += ` AND d.archived_at IS NULL AND d.deleted_at IS NULL`;
@@ -154,7 +154,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
     if (state) {
       const states = (state as string).split(',');
       query += ` AND d.properties->>'state' = ANY($${params.length + 1})`;
-      params.push(states as any);
+      params.push(states);
     }
 
     if (priority) {
@@ -226,7 +226,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
     const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
     query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-    params.push(limit as any, offset as any);
+    params.push(limit, offset);
 
     const result = await pool.query(query, params);
 

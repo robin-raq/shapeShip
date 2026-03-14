@@ -112,7 +112,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
         AND deleted_at IS NULL
         AND (visibility = 'workspace' OR created_by = $2 OR $3 = TRUE)
     `;
-    const params: (string | boolean | null)[] = [workspaceId, userId, isAdmin];
+    const params: QueryParam[] = [workspaceId, userId, isAdmin];
 
     if (type) {
       query += ` AND document_type = $${params.length + 1}`;
@@ -134,7 +134,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
     const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
     query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-    params.push(limit as any, offset as any);
+    params.push(limit, offset);
 
     const result = await pool.query(query, params);
 

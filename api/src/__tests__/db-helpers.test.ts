@@ -161,3 +161,31 @@ describe('narrowProperties', () => {
     expect(result.ease).toBe(3);
   });
 });
+
+// ---------------------------------------------------------------------------
+// QueryParam type — compile-time type acceptance tests
+// ---------------------------------------------------------------------------
+import type { QueryParam } from '../types/db-rows.js';
+
+describe('QueryParam type', () => {
+  it('accepts string[] for ANY() SQL operator without casting', () => {
+    // This test verifies at compile-time that string[] is assignable to QueryParam.
+    // If QueryParam doesn't include string[], this would require `as any`.
+    const states: string[] = ['active', 'done', 'cancelled'];
+    const params: QueryParam[] = ['workspace-1', states, true, null];
+
+    expect(params).toHaveLength(4);
+    expect(params[1]).toEqual(['active', 'done', 'cancelled']);
+  });
+
+  it('accepts number for LIMIT/OFFSET without casting', () => {
+    // Verify that numbers can go directly into params without `as any`
+    const limit = 50;
+    const offset = 0;
+    const params: QueryParam[] = ['workspace-1', limit, offset];
+
+    expect(params).toHaveLength(3);
+    expect(params[1]).toBe(50);
+    expect(params[2]).toBe(0);
+  });
+});
