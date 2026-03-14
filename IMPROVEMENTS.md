@@ -844,4 +844,301 @@ Four additional audit findings were addressed in this session:
 
 ---
 
+## Before/After Architecture
+
+This section provides a high-level view of how Ship's architecture changed across all three phases. Each subsection shows the structural transformation, not just metrics.
+
+### System Overview
+
+```
+BEFORE                                    AFTER
+══════════════════════════════════         ══════════════════════════════════
+
+  Browser                                   Browser
+    │                                         │
+    ▼                                         ▼
+  React App                                 React App
+  ┌──────────────┐                          ┌──────────────────────────────┐
+  │ raw fetch()  │                          │ TanStack Query (cache/retry) │
+  │ no error UI  │                          │ Error Boundaries             │
+  │ blank on 404 │                          │ 404 catch-all page           │
+  └──────┬───────┘                          │ Offline-resilient WS         │
+         │                                  └──────────┬───────────────────┘
+         │ HTTP                                        │ HTTP
+         ▼                                             ▼
+  Express API                               Express API
+  ┌──────────────┐                          ┌──────────────────────────────┐
+  │ console.log  │                          │ Pino structured logger       │
+  │ no error MW  │                          │ errorHandler middleware       │
+  │ any types    │                          │ Typed DB rows (db-rows.ts)   │
+  │ inline SQL   │                          │ CTE queries + helpers        │
+  └──────┬───────┘                          │ OpenAPI + Swagger            │
+         │                                  │ Process crash handlers       │
+         │ pg                               └──────────┬───────────────────┘
+         ▼                                             │ pg
+  PostgreSQL                                           ▼
+  ┌──────────────┐                          PostgreSQL
+  │ 35 correlated│                          ┌──────────────────────────────┐
+  │ subqueries   │                          │ 3 CTEs + LEFT JOINs          │
+  │ per list     │                          │ 89.9% fewer buffer reads     │
+  └──────────────┘                          └──────────────────────────────┘
+
+  No CI                                     GitHub Actions CI
+  ┌──────────────┐                          ┌──────────────────────────────┐
+  │ manual deploy│                          │ security-audit (pnpm audit)  │
+  │ no checks    │                          │ type-check                   │
+  └──────────────┘                          │ lint                         │
+                                            │ Auto-deploy via Railway      │
+                                            └──────────────────────────────┘
+```
+
+### 1. Error Handling Flow
+
+The biggest structural change: errors went from leaking raw stack traces to being caught at every layer.
+
+```
+BEFORE — Error paths                       AFTER — Error paths
+────────────────────                       ───────────────────
+
+  Route handler                              Route handler
+       │                                          │
+  try/catch?                                 try/catch
+  (sometimes)                                     │
+       │                                          ▼
+       ├── caught ──> console.error         errorHandler middleware
+       │              + ad-hoc JSON              │
+       │                                         ├── SyntaxError ──> 400
+       └── uncaught ──> Express default          ├── UNAUTHORIZED ──> 401
+                        HTML stack trace          ├── NOT_FOUND ──> 404
+                        leaked to client          └── unknown ──> 500
+                                                      │
+  process.on(                                    { "error": {
+    'unhandledRejection'                           "code": "...",
+  ) → NOT REGISTERED                               "message": "..."
+  → server crash                                 }}
+                                                      │
+                                            process-handlers.ts
+                                                 │
+                                                 ├── unhandledRejection
+                                                 │   → logger.fatal() + stay up
+                                                 └── uncaughtException
+                                                     → logger.fatal() + exit(1)
+```
+
+**Key change:** Three layers of defense (route try/catch → errorHandler middleware → process handlers) replaced ad-hoc error handling. No error path can leak a stack trace to the client.
+
+### 2. Logging Architecture
+
+Production code went from unstructured `console.*` to machine-parseable structured JSON.
+
+```
+BEFORE — Logging                           AFTER — Logging
+────────────────                           ───────────────
+
+  Route handler                              Route handler
+       │                                          │
+  console.log(                               logger.info(
+    'Creating doc',                            { workspaceId, docType },
+    req.body                                   'creating document'
+  )                                          )
+       │                                          │
+       ▼                                          ▼
+  stdout (plain text)                        stdout (structured JSON)
+  "Creating doc {                            {
+    title: 'My Doc'                            "level": 30,
+  }"                                           "time": 1741...,
+       │                                       "msg": "creating document",
+       ▼                                       "workspaceId": "abc-123",
+  Not queryable                                "docType": "issue"
+  Not filterable                             }
+  Not parseable                                   │
+                                                  ▼
+                                            Queryable by field
+                                            Filterable by level
+                                            Parseable by log aggregators
+
+  Environment behavior:
+  ┌────────────┬────────────────────┐
+  │ test       │ silent (no noise)  │
+  │ dev        │ pino-pretty (human)│
+  │ production │ raw JSON (machine) │
+  └────────────┴────────────────────┘
+```
+
+**Scope:** 396 `console.*` calls → 0 in production code. 91 remain in seed scripts, diagnostic tools, and test files (appropriate).
+
+### 3. Query Execution Pattern
+
+The sprint list query — Ship's most complex query — went from O(N) subquery executions to O(1) CTE passes.
+
+```
+BEFORE — Sprint list query                 AFTER — Sprint list query
+──────────────────────                     ─────────────────────────
+
+For each of 35 sprint rows:                Compute ONCE across all rows:
+
+  ┌─ SubPlan 1: COUNT issues ──────┐       ┌─ CTE: issue_stats ─────────┐
+  ├─ SubPlan 2: COUNT done ────────┤       │  GROUP BY sprint_id         │
+  ├─ SubPlan 3: COUNT in_progress ─┤       │  One pass over all issues   │
+  ├─ SubPlan 4: has_plan? ─────────┤       │  30 buffer hits total       │
+  ├─ SubPlan 5: has_retro? ────────┤       └────────────────────────────┘
+  ├─ SubPlan 6: retro_outcome ─────┤
+  └─ SubPlan 7: retro_id ─────────┘       ┌─ CTE: plan_check ──────────┐
+                                           │  GROUP BY parent_id         │
+  7 subqueries × 35 rows                  │  23 buffer hits total       │
+  = 245 index scan operations              └────────────────────────────┘
+
+  Total buffer reads: 1,929                ┌─ CTE: retro_info ──────────┐
+  Execution time: 4.762 ms                 │  DISTINCT ON sprint_id      │
+                                           │  31 buffer hits total       │
+                                           └────────────────────────────┘
+
+                                           Then: LEFT JOIN all 3 CTEs
+                                           Hash join = O(1) per row
+
+                                           Total buffer reads: 195
+                                           Execution time: 2.214 ms
+
+  Scaling: 7×N scans (linear)              Scaling: 3 scans (constant)
+```
+
+**Result:** 53.5% faster execution, 89.9% fewer buffer reads. The gap widens with more sprint rows.
+
+### 4. API Type Safety Layer
+
+Database results went from untyped `any` to compile-time verified row interfaces.
+
+```
+BEFORE — Data flow through API             AFTER — Data flow through API
+──────────────────────────                 ────────────────────────────
+
+  PostgreSQL                                PostgreSQL
+  ┌────────────────────┐                    ┌────────────────────┐
+  │ documents table    │                    │ documents table    │
+  │ (schema.sql)       │                    │ (schema.sql)       │
+  └────────┬───────────┘                    └────────┬───────────┘
+           │ rows                                    │ rows
+           ▼                                         ▼
+  pg query result                           pg query result
+  ┌────────────────────┐                    ┌─────────────────────────┐
+  │ row: any           │                    │ row: DocumentRow        │
+  │ No compile-time    │                    │ ┌─────────────────────┐ │
+  │ checks. Column     │                    │ │ id: string          │ │
+  │ renames compile    │                    │ │ title: string       │ │
+  │ fine, crash at     │                    │ │ document_type: ...  │ │
+  │ runtime.           │                    │ │ properties: Props   │ │
+  └────────┬───────────┘                    │ │   .state: string    │ │
+           │                                │ │   .priority: string │ │
+           ▼                                │ │   .ice_*: number    │ │
+  extract function                          │ └─────────────────────┘ │
+  ┌────────────────────┐                    └────────┬────────────────┘
+  │ function extract   │                             │ typed
+  │   Doc(row: any)    │                             ▼
+  │ // just trust it   │                    extract function
+  └────────────────────┘                    ┌─────────────────────────┐
+                                            │ function extractDoc     │
+  TypeScript safety: NONE                   │   (row: DocumentRow)    │
+  Schema drift detection: NONE              │ // compiler catches     │
+  JSONB properties: untyped                 │ // column mismatches    │
+                                            └─────────────────────────┘
+
+                                            TypeScript safety: FULL
+                                            Schema drift: compile error
+                                            JSONB properties: typed
+```
+
+**Result:** 48 → 29 explicit `any` (39.6% reduction). All `extractDocument` functions now have typed parameters. The JSONB `properties` column has typed fields for each document type's business logic.
+
+### 5. CI/CD Pipeline
+
+Ship went from zero automation to a three-check CI gate with auto-deploy.
+
+```
+BEFORE — Deploy workflow                   AFTER — Deploy workflow
+────────────────────────                   ───────────────────────
+
+  Developer                                 Developer
+       │                                         │
+  git push                                  git push / PR
+       │                                         │
+       ▼                                         ▼
+  Nothing happens                           GitHub Actions CI
+  (no checks)                               ┌──────────────────────┐
+       │                                    │  ┌─ security-audit ─┐ │
+       │                                    │  │  pnpm audit      │ │
+       ▼                                    │  │  --audit-level=  │ │
+  Manual deploy                             │  │  high            │ │
+  ┌──────────┐                              │  └──────────────────┘ │
+  │ railway  │                              │  ┌─ type-check ─────┐ │
+  │ up       │                              │  │  pnpm build:     │ │
+  │ (CLI)    │                              │  │  shared &&       │ │
+  └──────────┘                              │  │  pnpm type-check │ │
+                                            │  └──────────────────┘ │
+  Vulnerabilities: unchecked                │  ┌─ lint ───────────┐ │
+  Type errors: unchecked                    │  │  pnpm lint       │ │
+  Code style: unchecked                     │  └──────────────────┘ │
+                                            └──────────┬───────────┘
+                                                       │ all pass?
+                                                       ▼
+                                            Railway auto-deploy
+                                            ┌──────────────────────┐
+                                            │ Connected to GitHub   │
+                                            │ Deploys on push to    │
+                                            │ master automatically  │
+                                            └──────────────────────┘
+```
+
+**Result:** Every push runs security audit, type checking, and lint. Critical/high vulnerabilities block merge. Railway deploys automatically when CI passes.
+
+### 6. Frontend Resilience
+
+The React frontend gained three layers of resilience it previously lacked.
+
+```
+BEFORE — Frontend error handling           AFTER — Frontend error handling
+────────────────────────────               ─────────────────────────────
+
+  User navigates to                         User navigates to
+  /unknown-route                            /unknown-route
+       │                                         │
+       ▼                                         ▼
+  Blank white page                          404 NotFound page
+  (no catch-all route)                      (accessible, with nav links)
+
+
+  API returns 500                           API returns 500
+       │                                         │
+       ▼                                         ▼
+  fetch().then(...)                          TanStack Query
+  Uncaught error                            ┌───────────────────────┐
+  Console error                             │ retry: 3 attempts     │
+  Broken UI state                           │ staleTime: 5 min      │
+                                            │ error → Error Boundary │
+                                            └───────────────────────┘
+
+  Server goes offline                       Server goes offline
+  (during editing)                          (during editing)
+       │                                         │
+       ▼                                         ▼
+  y-websocket throws                        Offline guard
+  19 uncaught exceptions                    ┌───────────────────────┐
+  in 90 seconds                             │ navigator.onLine?     │
+  Error floods console                      │ ws.readyState check   │
+                                            │ Pause reconnection    │
+                                            │ 0 exceptions          │
+                                            └───────────────────────┘
+
+  Y.Doc on tab close                        Y.Doc on tab close
+       │                                         │
+       ▼                                         ▼
+  No cleanup                                ydoc.destroy()
+  Stale BroadcastChannel                    Clean unmount
+  listeners accumulate                      No memory leak
+  → memory leak
+```
+
+**Result:** Three failure modes (unknown routes, API errors, offline editing) all have graceful handling. The y-websocket offline fix eliminated 19 uncaught exceptions per 90-second offline period.
+
+---
+
 *Generated from Phase 1 audit baseline (2026-03-09), Phase 2 remediation (2026-03-09 to 2026-03-13), and Phase 3 quick wins (2026-03-13). Last updated 2026-03-13.*
