@@ -3,11 +3,8 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Disable SSL strict mode for government VPN environments
-RUN npm config set strict-ssl false
-
-# Install pnpm and disable SSL for it too
-RUN npm install -g pnpm@10 && pnpm config set strict-ssl false
+# Install pnpm
+RUN npm install -g pnpm@10
 
 # Copy all package.json files and workspace config
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
