@@ -1,21 +1,27 @@
 # Ship Improvements Report
 
-**Date:** 2026-03-11
-**Scope:** 7-category audit remediation + test infrastructure stabilization
-**Branch:** `fix/error-handling-and-test-infra`
+**Date:** 2026-03-11 → 2026-03-15
+**Scope:** 7-category audit remediation across 6 phases + security hardening
+**Branch:** `master` (merged from `fix/error-handling-and-test-infra`)
 
 ---
 
 ## Overview
 
-A 7-category audit established baseline metrics across the Ship codebase. Two phases of remediation followed: Phase 2 addressed the audit findings (9 commits), and a subsequent test infrastructure stabilization fixed all remaining test failures (6 files changed). This document tracks the before/after for each category.
+A 7-category audit established baseline metrics across the Ship codebase. Six phases of remediation followed, each building on the previous. This document tracks the before/after for each category and phase.
 
 ```
-Phase 1 (Audit)          Phase 2 (Remediation)       Phase 3 (Test Infra)
-─────────────────        ─────────────────────       ────────────────────
-Baseline metrics    ──>  Fix audit findings     ──>  Fix test suite
-7 categories             9 commits                   6 files
-20 findings              ~500 lines changed           100% pass rate
+Phase 1 (Audit)     Phase 2 (Remediation)  Phase 3 (Quick Wins)   Phase 4 (TypeScript)
+─────────────────   ─────────────────────  ────────────────────   ────────────────────
+Baseline metrics    Fix audit findings     Deps, logging, CI      queryRow<T>, pgBool
+7 categories        9 commits              4 improvements         narrowProperties
+20 findings         ~500 lines changed     100% pass rate         QueryParam widening
+
+Phase 5 (Bundle)    Phase 6 (Security)
+─────────────────   ─────────────────
+Vendor splitting    strict-ssl removal
+Lighthouse 100      PG session store
+75.9% load ↓        2 High findings fixed
 ```
 
 ---
@@ -1196,4 +1202,136 @@ BEFORE — Frontend error handling           AFTER — Frontend error handling
 
 ---
 
-*Generated from Phase 1 audit baseline (2026-03-09), Phase 2 remediation (2026-03-09 to 2026-03-13), Phase 3 quick wins (2026-03-13), Phase 4 TypeScript strengthening (2026-03-13), and Phase 5 bundle reduction + Lighthouse accessibility (2026-03-14). Last updated 2026-03-14.*
+## Phase 6: Security Hardening (2026-03-15)
+
+An independent security review identified 7 findings (2 High, 3 Medium, 2 Low). Phase 6 addressed both High-severity findings. The remaining 5 findings are tracked as backlog.
+
+### Finding #1 (High): Container Supply-Chain — `strict-ssl=false` in Docker Builds
+
+**Problem:** All three Dockerfiles (`Dockerfile`, `Dockerfile.dev`, `Dockerfile.web`) disabled TLS certificate validation during `pnpm install` with `npm config set strict-ssl false` and `pnpm config set strict-ssl false`. This allowed man-in-the-middle attacks to swap npm packages during Docker image builds — a supply-chain attack vector.
+
+```
+BEFORE — Docker build (Dockerfile)           AFTER — Docker build (Dockerfile)
+──────────────────────────────               ─────────────────────────────────
+
+  FROM node:20-slim                            FROM node:20-slim
+       │                                            │
+       ▼                                            ▼
+  npm config set strict-ssl false              npm install -g pnpm@9.15.4
+  pnpm config set strict-ssl false                  │
+  pnpm install                                      ▼
+       │                                       pnpm install
+       ▼                                            │
+  ❌ TLS validation DISABLED                        ▼
+  MITM can swap packages                       ✅ TLS validation ENABLED
+  during dependency install                    Certificates verified normally
+```
+
+**Root cause:** The override was likely added to work around a corporate proxy or self-signed certificate issue during early development. Docker containers start with a clean environment where public npm registry certificates are trusted — the override was unnecessary.
+
+**Fix:** Removed all `strict-ssl false` lines from all three Dockerfiles.
+
+**Files changed:** `Dockerfile`, `Dockerfile.dev`, `Dockerfile.web`
+**Commit:** `197cb96`
+
+### Finding #2 (High): In-Memory Session Store → PostgreSQL
+
+**Problem:** The `express-session` middleware used the default `MemoryStore` in production. This caused two issues:
+1. **Memory leak:** Session objects accumulate in heap memory with no eviction
+2. **Session loss on restart:** All CSRF tokens invalidated on server restart, breaking in-flight user requests
+
+**Discovery during investigation:** Ship has *two* session systems:
+1. **Auth sessions** — Custom `sessions` table in PostgreSQL (15-min inactivity + 12-hour absolute timeout). Already production-ready.
+2. **CSRF token sessions** — `express-session` MemoryStore. Used *only* by `csrf-sync` for CSRF token storage. This was the vulnerability.
+
+```
+BEFORE — CSRF session storage               AFTER — CSRF session storage
+──────────────────────────────               ────────────────────────────
+
+  POST /api/issues                            POST /api/issues
+       │                                           │
+       ▼                                           ▼
+  express-session                             express-session
+  ┌───────────────────┐                       ┌───────────────────────┐
+  │ MemoryStore        │                       │ connect-pg-simple      │
+  │                   │                       │                       │
+  │ CSRF tokens in    │                       │ CSRF tokens in        │
+  │ process memory    │                       │ http_sessions table    │
+  │                   │                       │ (PostgreSQL)           │
+  │ ❌ Leaks memory   │                       │                       │
+  │ ❌ Lost on restart │                       │ ✅ Survives restarts   │
+  │ ❌ Single-process  │                       │ ✅ No memory leak      │
+  │    only           │                       │ ✅ Auto-prune expired  │
+  └───────────────────┘                       │    every 15 minutes   │
+                                              └───────────────────────┘
+```
+
+**Key decision: PostgreSQL over Redis.** Ship already has PostgreSQL. Adding Redis for CSRF token storage would mean new infrastructure, new dependency, new failure mode — all for storing a few hundred short-lived tokens. `connect-pg-simple` reuses the existing database connection pool.
+
+**What changed:**
+- Added `connect-pg-simple` dependency to `api/package.json`
+- Created migration `038_http_sessions_table.sql` with `sid`, `sess`, `expire` columns
+- Updated `api/src/app.ts` to use `PgStore` in non-test environments (test mode still uses MemoryStore for isolation)
+- Added `http_sessions` table definition to `schema.sql` for fresh database setups
+- Created 3 tests in `session-store.test.ts` (CSRF token generation, session cookie setting, session reuse)
+
+**Files changed:** `api/src/app.ts`, `api/src/db/schema.sql`, `api/src/db/migrations/038_http_sessions_table.sql`, `api/src/__tests__/session-store.test.ts`, `api/package.json`
+**Commits:** `45953ad`, `4f876db`
+
+### Remaining Security Findings (Backlog)
+
+| # | Severity | Finding | Status |
+|---|----------|---------|--------|
+| 3 | Medium | CSP `unsafe-inline` for scripts/styles | Tracked — requires TipTap editor refactor |
+| 4 | Medium | `innerHTML` in CommentDisplay.tsx, AIScoringDisplay.tsx | Tracked |
+| 5 | Medium | 58 `no-explicit-any` lint warnings in editor/collab paths | Tracked |
+| 6 | Low | 2 remaining dependency vulnerabilities | Tracked |
+| 7 | Low | Dynamic ORDER BY (already guarded with whitelist) | No action needed |
+
+### Phase 6 Totals
+
+| Metric | Value |
+|--------|-------|
+| Commits | 3 |
+| Files changed | 8 |
+| Security findings resolved | 2 (both High severity) |
+| New tests | 3 |
+| New migration | 1 (`038_http_sessions_table.sql`) |
+| New dependency | 1 (`connect-pg-simple`) |
+
+---
+
+## Summary: Complete Remediation Timeline
+
+```
+Phase 1 (Audit)       Phase 2 (Remediation)    Phase 3 (Quick Wins)
+2026-03-09            2026-03-09 → 03-13       2026-03-13
+──────────────        ───────────────────       ─────────────────
+Baseline metrics      Fix audit findings        Deps, logging,
+7 categories          9 commits                 CI pipeline
+20 findings           ~500 lines changed        4 improvements
+
+Phase 4 (TypeScript)  Phase 5 (Bundle/A11y)    Phase 6 (Security)
+2026-03-13            2026-03-14               2026-03-15
+──────────────        ───────────────────       ─────────────────
+queryRow<T>/pgBool    vendor splitting          strict-ssl removal
+narrowProperties      Lighthouse 100            PG session store
+QueryParam widening   75.9% initial load ↓      2 High findings fixed
+```
+
+### Cumulative Impact
+
+| Category | Original State | Current State |
+|----------|---------------|---------------|
+| Type Safety | 48 explicit `any`, 0 typed rows | 14 `any` (-71%), 13 SQL-verified row types |
+| Bundle Size | 2,074 KB initial load | 500 KB initial (-75.9%), vendor-split chunks |
+| API Response | Unbounded payloads, no pagination | Paginated, slim responses, benchmarked |
+| Database Queries | Correlated subqueries, seq scans | CTE aggregation, indexed lookups |
+| Test Coverage | E2E infrastructure broken | 520+ unit tests passing, E2E stabilized |
+| Runtime Errors | 19 uncaught exceptions/90s offline | 0 exceptions, graceful degradation |
+| Accessibility | Lighthouse 82 | Lighthouse 100 |
+| Security | strict-ssl disabled, MemoryStore | TLS enforced, PostgreSQL session store |
+
+---
+
+*Generated from Phase 1 audit baseline (2026-03-09), Phase 2 remediation (2026-03-09 to 2026-03-13), Phase 3 quick wins (2026-03-13), Phase 4 TypeScript strengthening (2026-03-13), Phase 5 bundle reduction + Lighthouse accessibility (2026-03-14), and Phase 6 security hardening (2026-03-15). Last updated 2026-03-15.*
