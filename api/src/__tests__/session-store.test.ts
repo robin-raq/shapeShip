@@ -30,10 +30,10 @@ describe('Session Store — CSRF Token Flow', () => {
     const res = await request(app).get('/api/csrf-token');
 
     // express-session sets a connect.sid cookie to track the session
-    const cookies = res.headers['set-cookie'];
+    const cookies = res.headers['set-cookie'] as string[] | undefined;
     expect(cookies).toBeDefined();
 
-    const hasSessionCookie = cookies.some((c: string) => c.startsWith('connect.sid='));
+    const hasSessionCookie = cookies!.some((c) => c.startsWith('connect.sid='));
     expect(hasSessionCookie).toBe(true);
   });
 
@@ -41,13 +41,14 @@ describe('Session Store — CSRF Token Flow', () => {
     // First request: get token + session cookie
     const firstRes = await request(app).get('/api/csrf-token');
     const token1 = firstRes.body.token;
-    const cookies = firstRes.headers['set-cookie'];
-    const sessionCookie = cookies.find((c: string) => c.startsWith('connect.sid='));
+    const cookies = firstRes.headers['set-cookie'] as string[] | undefined;
+    expect(cookies).toBeDefined();
+    const sessionCookie = cookies!.find((c) => c.startsWith('connect.sid='));
 
     // Second request: send same session cookie, should get same token
     const secondRes = await request(app)
       .get('/api/csrf-token')
-      .set('Cookie', sessionCookie);
+      .set('Cookie', sessionCookie!);
     const token2 = secondRes.body.token;
 
     // Same session should produce the same CSRF token
