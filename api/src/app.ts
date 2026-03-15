@@ -3,10 +3,12 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { csrfSync } from 'csrf-sync';
 import rateLimit from 'express-rate-limit';
+import { pool } from './db/client.js';
 import authRoutes from './routes/auth.js';
 import documentsRoutes from './routes/documents.js';
 import issuesRoutes from './routes/issues.js';
@@ -160,8 +162,11 @@ export function createApp(corsOrigin: string = 'http://localhost:5173'): express
     app.use(pinoHttp({ logger, autoLogging: true }));
   }
 
-  // Session middleware for CSRF token storage
-  app.use(session({
+  // Session middleware for CSRF token storage.
+  // Uses PostgreSQL via connect-pg-simple in production/dev (survives restarts,
+  // no memory leak). Falls back to default MemoryStore in test mode (no DB needed).
+  const PgStore = connectPgSimple(session);
+  const sessionConfig: session.SessionOptions = {
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
@@ -171,7 +176,18 @@ export function createApp(corsOrigin: string = 'http://localhost:5173'): express
       sameSite: 'strict',
       maxAge: 15 * 60 * 1000, // 15 minutes
     },
-  }));
+  };
+
+  if (process.env.NODE_ENV !== 'test') {
+    sessionConfig.store = new PgStore({
+      pool,
+      tableName: 'http_sessions',
+      // Auto-clean expired sessions every 15 minutes
+      pruneSessionInterval: 15 * 60,
+    });
+  }
+
+  app.use(session(sessionConfig));
 
   // CSRF token endpoint (must be before CSRF protection middleware)
   app.get('/api/csrf-token', (req, res) => {

@@ -86,6 +86,15 @@ CREATE TABLE IF NOT EXISTS sessions (
   ip_address TEXT
 );
 
+-- HTTP sessions for express-session (CSRF token storage via connect-pg-simple).
+-- Separate from the custom 'sessions' table which handles auth sessions.
+CREATE TABLE IF NOT EXISTS http_sessions (
+  sid VARCHAR NOT NULL PRIMARY KEY,
+  sess JSON NOT NULL,
+  expire TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_http_sessions_expire ON http_sessions (expire);
+
 -- OAuth state (survives server restarts during auth flow)
 CREATE TABLE IF NOT EXISTS oauth_state (
   state_id TEXT PRIMARY KEY,
