@@ -5,7 +5,7 @@ FROM public.ecr.aws/docker/library/node:20-slim
 WORKDIR /app
 
 # Install pnpm
-RUN npm install -g pnpm@9.15.4
+RUN npm install -g pnpm@10.27.0
 
 # Copy package files for dependency installation
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./

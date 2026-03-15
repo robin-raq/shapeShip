@@ -34,9 +34,12 @@ async function main() {
   const server = createServer(app);
 
   // DDoS protection: Set server-wide timeouts to prevent slow-read attacks (Slowloris)
-  server.timeout = 60000; // 60 seconds max request duration
-  server.keepAliveTimeout = 65000; // 65 seconds (slightly longer than timeout)
-  server.headersTimeout = 66000; // 66 seconds (slightly longer than keepAlive)
+  const SERVER_TIMEOUT_MS = 60_000;
+  const KEEP_ALIVE_TIMEOUT_MS = 65_000;
+  const HEADERS_TIMEOUT_MS = 66_000;
+  server.timeout = SERVER_TIMEOUT_MS;
+  server.keepAliveTimeout = KEEP_ALIVE_TIMEOUT_MS;
+  server.headersTimeout = HEADERS_TIMEOUT_MS;
 
   // Setup WebSocket collaboration server
   setupCollaboration(server);
