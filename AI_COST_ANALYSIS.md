@@ -10,12 +10,12 @@
 
 | Metric | Value |
 |--------|-------|
-| Claude Code sessions | ~8–10 sessions (Phases 1–4) |
-| Approximate duration | ~16–20 hours of active session time |
-| Total commits generated | 35 (across `fix/error-handling-and-test-infra` + `master`) |
-| Total lines changed | 6,939 insertions, 1,012 deletions across 89 files |
-| Files created | ~15 new files |
-| Files modified | ~74 existing files |
+| Claude Code sessions | ~12–15 sessions (Phases 1–6) |
+| Approximate duration | ~24–30 hours of active session time |
+| Total commits generated | ~38 (across `fix/error-handling-and-test-infra` + `master`) |
+| Total lines changed | ~8,500 insertions, ~1,400 deletions across 100+ files |
+| Files created | ~20 new files |
+| Files modified | ~80 existing files |
 
 ### LLM API Costs
 
@@ -23,18 +23,18 @@
 
 | Metric | Estimate | Notes |
 |--------|----------|-------|
-| Input tokens (estimated) | ~12–18M tokens | Codebase reads, grep results, file exploration across 8–10 sessions |
-| Output tokens (estimated) | ~3–5M tokens | Code generation, explanations, analysis across all phases |
-| Total tokens (estimated) | ~15–23M tokens | Combined I/O across entire audit |
-| Estimated cost (at API Opus rates) | ~$230–370 | At $15/MTok input, $75/MTok output (theoretical) |
+| Input tokens (estimated) | ~18–25M tokens | Codebase reads, grep results, file exploration across 12–15 sessions |
+| Output tokens (estimated) | ~5–7M tokens | Code generation, explanations, analysis across all 6 phases |
+| Total tokens (estimated) | ~23–32M tokens | Combined I/O across entire audit + security hardening |
+| Estimated cost (at API Opus rates) | ~$350–550 | At $15/MTok input, $75/MTok output (theoretical) |
 | Actual subscription cost | $100/month | Claude Max — flat rate, unlimited usage within limits |
-| Estimated total actual spend | ~$100–200 | 1–2 months of Max subscription covering Phases 1–4 |
+| Estimated total actual spend | ~$200 | ~2 months of Max subscription covering Phases 1–6 |
 
 ### Coding Agent Costs
 
 | Agent | Cost model | Estimated spend |
 |-------|-----------|-----------------|
-| Claude Code (CLI) | Included in Max subscription | $100–200 (1–2 months) |
+| Claude Code (CLI) | Included in Max subscription | ~$200 (~2 months) |
 | Other tools (Cursor, Copilot, etc.) | N/A | $0 — not used |
 
 ---
@@ -131,6 +131,8 @@ The lesson: AI is a force multiplier for exploration but a crutch for comprehens
 
 5. **`QueryParam` type widening (Phase 4).** The AI initially suggested a complex union type with `Date` and `Buffer` support. I narrowed it to just adding `string[]` — the only type actually needed for SQL `ANY()` operators — following YAGNI principles. The fix removed 3 `as any` casts without introducing unnecessary complexity.
 
+6. **TDD discipline enforcement (Phase 6).** The AI implemented the innerHTML→DOM API refactor and editor `any` burn-down without writing tests first, violating the project's TDD rule. I caught this and required tests to be written before committing. The resulting 51 tests covered DOM structure, XSS safety assertions, and matching algorithm correctness — tests that would have been written *first* under proper TDD. This reinforces that AI tools need human enforcement of development discipline, not just code review.
+
 ### What percentage of your final code changes were AI-generated vs. hand-written?
 
 | Category | AI-generated | Human-directed | Human-written |
@@ -143,20 +145,25 @@ The lesson: AI is a force multiplier for exploration but a crutch for comprehens
 | Accessibility fixes | ~90% | ~10% review | — |
 | CRDT BroadcastChannel fix | ~50% | ~50% design | Key insight was manual |
 | TypeScript strengthening (Phase 4) | ~85% | ~15% review | TDD approach guided output |
+| Security hardening (Phase 6) | ~90% | ~10% review | — |
+| innerHTML → DOM API refactor | ~85% | ~15% review | TDD enforcement was human-directed |
+| Editor any burn-down | ~90% | ~10% review | TipTap type selection was human-verified |
+| DOM security tests (51 tests) | ~90% | ~10% review | XSS assertion strategy was human-directed |
+| Codebase cleanup | ~85% | ~15% review | Stale file decisions required judgment |
 | Documentation (audit, improvements) | ~75% | ~25% editing | Framing was manual |
 
-**Overall estimate: ~78% AI-generated code, ~22% human-directed corrections and design decisions.**
+**Overall estimate: ~80% AI-generated code, ~20% human-directed corrections and design decisions.**
 
-The 22% human contribution was disproportionately important — it caught the five errors listed above (false type inheritance, wrong boolean typing, inflated counts, inflated baselines, over-engineered QueryParam) that would have undermined the credibility of the entire audit.
+The 20% human contribution was disproportionately important — it caught the six issues listed above (false type inheritance, wrong boolean typing, inflated counts, inflated baselines, over-engineered QueryParam, and TDD discipline enforcement) that would have undermined the credibility of the entire audit.
 
 ---
 
 ## Summary
 
 ### Development Costs
-- **Actual spend:** ~$100–200 (1–2 months of Claude Max subscription at $100/mo)
-- **Theoretical API cost:** ~$230–370 (if billed at per-token Opus rates)
-- **Output:** 35 commits, 89 files changed, 6,939 insertions / 1,012 deletions across 4 audit phases
+- **Actual spend:** ~$200 (~2 months of Claude Max subscription at $100/mo)
+- **Theoretical API cost:** ~$350–550 (if billed at per-token Opus rates)
+- **Output:** ~38 commits, 100+ files changed, ~8,500 insertions / ~1,400 deletions across 6 audit phases
 
 ### Production AI Costs
 - **Service:** AWS Bedrock Claude 3.7 Sonnet (Quality Assistant for sprint plans/retros)

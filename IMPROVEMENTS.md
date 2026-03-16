@@ -1204,7 +1204,7 @@ BEFORE — Frontend error handling           AFTER — Frontend error handling
 
 ## Phase 6: Security Hardening (2026-03-15)
 
-An independent security review identified 7 findings (2 High, 3 Medium, 2 Low). Phase 6 addressed both High-severity findings. The remaining 5 findings are tracked as backlog.
+An independent security review identified 7 findings (2 High, 3 Medium, 2 Low). Phase 6 addressed both High-severity findings plus both fixable Medium-severity findings. The remaining findings are either blocked by upstream dependencies or require no action.
 
 ### Finding #1 (High): Container Supply-Chain — `strict-ssl=false` in Docker Builds
 
@@ -1278,6 +1278,52 @@ BEFORE — CSRF session storage               AFTER — CSRF session storage
 **Files changed:** `api/src/app.ts`, `api/src/db/schema.sql`, `api/src/db/migrations/038_http_sessions_table.sql`, `api/src/__tests__/session-store.test.ts`, `api/package.json`
 **Commits:** `45953ad`, `4f876db`
 
+### Finding #4 (Medium): innerHTML → DOM API (XSS Hardening)
+
+**Problem:** `CommentDisplay.tsx` and `AIScoringDisplay.tsx` used `innerHTML` template strings to build widget decorations. Any user-supplied content (comment text, author names, AI feedback) was run through a manual `escapeHtml()` function before insertion. While the escape function worked, this pattern is fragile — a single missed call creates an XSS vulnerability.
+
+**Fix:** Replaced all `innerHTML` assignments with DOM API calls (`createElement`, `textContent`, `appendChild`). This makes XSS **structurally impossible** — there is no codepath where a raw string becomes parsed HTML. The `escapeHtml()` function was removed entirely because it's no longer needed.
+
+Added DOM builder helpers to keep the code readable:
+
+```typescript
+// CommentDisplay.tsx — generic element builder
+function el(tag: string, className: string, text?: string): HTMLElement {
+  const node = document.createElement(tag);
+  node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+// Both files — span shorthand
+function span(className: string, text: string): HTMLSpanElement { ... }
+```
+
+**Key insight:** `textContent` is the critical difference. Unlike `innerHTML`, `textContent` treats everything as plain text — `<script>alert(1)</script>` becomes the literal string, not executable HTML.
+
+**Files changed:** `CommentDisplay.tsx`, `AIScoringDisplay.tsx`
+**Tests added:** 51 tests across 2 new test files covering DOM structure, XSS safety assertions, matching algorithm, and thread grouping
+**Commit:** `7e5030d`
+
+### Finding #5 (Medium): Editor `any` Burn-Down
+
+**Problem:** 27 `any` type annotations across 4 editor/collaboration files (`CommentDisplay.tsx`, `AIScoringDisplay.tsx`, `FileAttachment.tsx`, `SlashCommands.tsx`). These weakened TypeScript's ability to catch refactoring errors in the editor layer.
+
+**Fix:** Replaced 23 of 27 `any` usages with proper TipTap types:
+
+| Type replacement | Count | Files |
+|-----------------|-------|-------|
+| `any` → `PMNode` (from `@tiptap/pm/model`) | 12 | CommentDisplay, AIScoringDisplay, FileAttachment |
+| `any` → `Editor` (from `@tiptap/core`) | 3 | FileAttachment, SlashCommands |
+| `any` → `Range` (from `@tiptap/core`) | 2 | SlashCommands |
+| `any` → `SuggestionProps<T>` / `SuggestionKeyDownProps` | 2 | SlashCommands |
+| Removed unnecessary `as any` cast | 4 | SlashCommands (tippy null safety) |
+
+**4 remaining `any` (irreducible):** All in `FileAttachment.tsx` — TipTap dynamically registers extension commands (e.g., `setFileAttachment`) that don't exist on the `ChainedCommands` type at compile time. These require `as any` at the call site with eslint-disable comments.
+
+**Files changed:** `CommentDisplay.tsx`, `AIScoringDisplay.tsx`, `FileAttachment.tsx`, `SlashCommands.tsx`
+**Commit:** `7e5030d`
+
 ### Remaining Security Findings (Backlog)
 
 | # | Severity | Finding | Status |
@@ -1292,12 +1338,14 @@ BEFORE — CSRF session storage               AFTER — CSRF session storage
 
 | Metric | Value |
 |--------|-------|
-| Commits | 3 |
-| Files changed | 8 |
+| Commits | 4 |
+| Files changed | 12 |
 | Security findings resolved | 4 (2 High + 2 Medium severity) |
-| New tests | 3 |
+| New tests | 54 (3 session store + 51 DOM/type safety) |
 | New migration | 1 (`038_http_sessions_table.sql`) |
 | New dependency | 1 (`connect-pg-simple`) |
+| `any` reduced | 23 (from 27 to 4 irreducible in editor modules) |
+| innerHTML eliminated | 100% — zero innerHTML usage remaining |
 
 ---
 
@@ -1316,7 +1364,9 @@ Phase 4 (TypeScript)  Phase 5 (Bundle/A11y)    Phase 6 (Security)
 ──────────────        ───────────────────       ─────────────────
 queryRow<T>/pgBool    vendor splitting          strict-ssl removal
 narrowProperties      Lighthouse 100            PG session store
-QueryParam widening   75.9% initial load ↓      2 High findings fixed
+QueryParam widening   75.9% initial load ↓      innerHTML → DOM API
+                                                any → typed (23 fixed)
+                                                4 findings resolved
 ```
 
 ### Cumulative Impact
@@ -1327,11 +1377,11 @@ QueryParam widening   75.9% initial load ↓      2 High findings fixed
 | Bundle Size | 2,074 KB initial load | 500 KB initial (-75.9%), vendor-split chunks |
 | API Response | Unbounded payloads, no pagination | Paginated, slim responses, benchmarked |
 | Database Queries | Correlated subqueries, seq scans | CTE aggregation, indexed lookups |
-| Test Coverage | E2E infrastructure broken | 520+ unit tests passing, E2E stabilized |
+| Test Coverage | E2E infrastructure broken | 745 unit tests passing (539 API + 206 web), E2E stabilized |
 | Runtime Errors | 19 uncaught exceptions/90s offline | 0 exceptions, graceful degradation |
 | Accessibility | Lighthouse 82 | Lighthouse 100 |
-| Security | strict-ssl disabled, MemoryStore | TLS enforced, PostgreSQL session store |
+| Security | strict-ssl disabled, MemoryStore, innerHTML XSS risk | TLS enforced, PG session store, DOM API (zero innerHTML), 4/7 findings resolved |
 
 ---
 
-*Generated from Phase 1 audit baseline (2026-03-09), Phase 2 remediation (2026-03-09 to 2026-03-13), Phase 3 quick wins (2026-03-13), Phase 4 TypeScript strengthening (2026-03-13), Phase 5 bundle reduction + Lighthouse accessibility (2026-03-14), and Phase 6 security hardening (2026-03-15). Last updated 2026-03-15.*
+*Generated from Phase 1 audit baseline (2026-03-09), Phase 2 remediation (2026-03-09 to 2026-03-13), Phase 3 quick wins (2026-03-13), Phase 4 TypeScript strengthening (2026-03-13), Phase 5 bundle reduction + Lighthouse accessibility (2026-03-14), and Phase 6 security hardening including innerHTML elimination and editor type safety (2026-03-15). Last updated 2026-03-15.*
