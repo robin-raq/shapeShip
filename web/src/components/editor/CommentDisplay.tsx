@@ -1,15 +1,28 @@
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Node as PMNode } from '@tiptap/pm/model';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
-import { createRoot, Root } from 'react-dom/client';
 import { Comment } from '@/hooks/useCommentsQuery';
 import { formatRelativeTime } from '@/lib/date-utils';
+
+/** Create a DOM element with className and optional text content */
+export function el(tag: string, className: string, text?: string): HTMLElement {
+  const node = document.createElement(tag);
+  node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+/** Create a span element with className and text content */
+export function span(className: string, text: string): HTMLSpanElement {
+  return el('span', className, text) as HTMLSpanElement;
+}
 
 /**
  * Groups comments by their comment_id (thread identifier).
  * Returns a map of commentId -> array of comments (root + replies).
  */
-function groupByThread(comments: Comment[]): Map<string, Comment[]> {
+export function groupByThread(comments: Comment[]): Map<string, Comment[]> {
   const threads = new Map<string, Comment[]>();
   for (const comment of comments) {
     const existing = threads.get(comment.comment_id) || [];
@@ -23,10 +36,10 @@ function groupByThread(comments: Comment[]): Map<string, Comment[]> {
  * Find all comment mark positions in the document.
  * Returns a map of commentId -> end position of the containing block.
  */
-function findCommentPositions(doc: any): Map<string, number> {
+function findCommentPositions(doc: PMNode): Map<string, number> {
   const positions = new Map<string, number>();
 
-  doc.descendants((node: any, pos: number) => {
+  doc.descendants((node: PMNode, pos: number) => {
     if (node.isText) {
       for (const mark of node.marks) {
         if (mark.type.name === 'commentMark' && mark.attrs.commentId) {
@@ -59,7 +72,7 @@ interface CommentDisplayStorage {
  * InlineCommentThread component rendered inside widget decorations.
  * Displays a GitHub-style comment card that breaks the document flow.
  */
-function InlineCommentThread({
+export function InlineCommentThread({
   thread,
   quotedText,
   onReply,
@@ -82,55 +95,52 @@ function InlineCommentThread({
   container.contentEditable = 'false';
 
   if (isResolved) {
-    container.innerHTML = `
-      <div class="comment-thread-resolved" data-comment-id="${escapeHtml(root.comment_id)}">
-        <span class="comment-resolved-icon">✓</span>
-        <span class="comment-resolved-text">Resolved by ${escapeHtml(root.author.name)} · ${formatRelativeTime(root.resolved_at!)}</span>
-        <span class="comment-resolved-toggle">Show thread</span>
-      </div>
-    `;
+    const resolved = el('div', 'comment-thread-resolved');
+    resolved.dataset.commentId = root.comment_id;
+    resolved.appendChild(span('comment-resolved-icon', '✓'));
+    resolved.appendChild(span('comment-resolved-text', `Resolved by ${root.author.name} · ${formatRelativeTime(root.resolved_at!)}`));
+    resolved.appendChild(span('comment-resolved-toggle', 'Show thread'));
+    container.appendChild(resolved);
   } else {
-    const quotedHtml = quotedText
-      ? `<div class="comment-quoted-text">"${escapeHtml(quotedText)}"</div>`
-      : '';
-
-    let repliesHtml = '';
-    for (const reply of replies) {
-      repliesHtml += `
-        <div class="comment-reply">
-          <div class="comment-header">
-            <span class="comment-author">${escapeHtml(reply.author.name)}</span>
-            <span class="comment-time">${formatRelativeTime(reply.created_at)}</span>
-          </div>
-          <div class="comment-body">${escapeHtml(reply.content)}</div>
-        </div>
-      `;
+    if (quotedText) {
+      container.appendChild(el('div', 'comment-quoted-text', `"${quotedText}"`));
     }
 
-    container.innerHTML = `
-      ${quotedHtml}
-      <div class="comment-root">
-        <div class="comment-header">
-          <span class="comment-author">${escapeHtml(root.author.name)}</span>
-          <span class="comment-time">${formatRelativeTime(root.created_at)}</span>
-          <button class="comment-resolve-btn" data-comment-id="${escapeHtml(root.comment_id)}" title="Resolve">✓</button>
-        </div>
-        <div class="comment-body">${escapeHtml(root.content)}</div>
-      </div>
-      ${repliesHtml}
-      <div class="comment-reply-area">
-        <input type="text" class="comment-reply-input" placeholder="Reply..." data-comment-id="${escapeHtml(root.comment_id)}" />
-      </div>
-    `;
+    const rootEl = el('div', 'comment-root');
+    const header = el('div', 'comment-header');
+    header.appendChild(span('comment-author', root.author.name));
+    header.appendChild(span('comment-time', formatRelativeTime(root.created_at)));
+    const resolveBtn = document.createElement('button');
+    resolveBtn.className = 'comment-resolve-btn';
+    resolveBtn.dataset.commentId = root.comment_id;
+    resolveBtn.title = 'Resolve';
+    resolveBtn.textContent = '✓';
+    header.appendChild(resolveBtn);
+    rootEl.appendChild(header);
+    rootEl.appendChild(el('div', 'comment-body', root.content));
+    container.appendChild(rootEl);
+
+    for (const reply of replies) {
+      const replyEl = el('div', 'comment-reply');
+      const replyHeader = el('div', 'comment-header');
+      replyHeader.appendChild(span('comment-author', reply.author.name));
+      replyHeader.appendChild(span('comment-time', formatRelativeTime(reply.created_at)));
+      replyEl.appendChild(replyHeader);
+      replyEl.appendChild(el('div', 'comment-body', reply.content));
+      container.appendChild(replyEl);
+    }
+
+    const replyArea = el('div', 'comment-reply-area');
+    const replyInput = document.createElement('input');
+    replyInput.type = 'text';
+    replyInput.className = 'comment-reply-input';
+    replyInput.placeholder = 'Reply...';
+    replyInput.dataset.commentId = root.comment_id;
+    replyArea.appendChild(replyInput);
+    container.appendChild(replyArea);
   }
 
   return container;
-}
-
-function escapeHtml(str: string): string {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
 }
 
 /**
@@ -176,11 +186,14 @@ export const CommentDisplayExtension = Extension.create<Record<string, never>, C
                   const container = document.createElement('div');
                   container.className = 'comment-thread-inline comment-pending-input';
                   container.contentEditable = 'false';
-                  container.innerHTML = `
-                    <div class="comment-pending-label">Add your comment:</div>
-                    <input type="text" class="comment-pending-field" placeholder="Write a comment..." data-pending-comment-id="${escapeHtml(pendingId)}" />
-                    <div class="comment-pending-hint">Press Enter to submit, Escape to cancel</div>
-                  `;
+                  container.appendChild(el('div', 'comment-pending-label', 'Add your comment:'));
+                  const pendingInput = document.createElement('input');
+                  pendingInput.type = 'text';
+                  pendingInput.className = 'comment-pending-field';
+                  pendingInput.placeholder = 'Write a comment...';
+                  pendingInput.dataset.pendingCommentId = pendingId;
+                  container.appendChild(pendingInput);
+                  container.appendChild(el('div', 'comment-pending-hint', 'Press Enter to submit, Escape to cancel'));
                   // Auto-focus the input after it's added to the DOM
                   requestAnimationFrame(() => {
                     const input = container.querySelector('.comment-pending-field') as HTMLInputElement;
@@ -210,7 +223,7 @@ export const CommentDisplayExtension = Extension.create<Record<string, never>, C
             for (const [commentId, thread] of threads.entries()) {
               const isResolved = thread[0].resolved_at !== null;
               if (isResolved) {
-                doc.descendants((node: any, pos: number) => {
+                doc.descendants((node: PMNode, pos: number) => {
                   if (node.isText) {
                     for (const mark of node.marks) {
                       if (mark.type.name === 'commentMark' && mark.attrs.commentId === commentId) {
@@ -232,7 +245,7 @@ export const CommentDisplayExtension = Extension.create<Record<string, never>, C
 
               // Find the quoted text for this comment
               let quotedText = '';
-              doc.descendants((node: any, pos: number) => {
+              doc.descendants((node: PMNode, pos: number) => {
                 if (node.isText) {
                   for (const mark of node.marks) {
                     if (

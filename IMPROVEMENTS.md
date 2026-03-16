@@ -1283,9 +1283,9 @@ BEFORE — CSRF session storage               AFTER — CSRF session storage
 | # | Severity | Finding | Status |
 |---|----------|---------|--------|
 | 3 | Medium | CSP `unsafe-inline` for scripts/styles | Tracked — requires TipTap editor refactor |
-| 4 | Medium | `innerHTML` in CommentDisplay.tsx, AIScoringDisplay.tsx | Tracked |
-| 5 | Medium | 58 `no-explicit-any` lint warnings in editor/collab paths | Tracked |
-| 6 | Low | 2 remaining dependency vulnerabilities | Tracked |
+| 4 | Medium | `innerHTML` in CommentDisplay.tsx, AIScoringDisplay.tsx | ✅ **Resolved** — replaced with DOM API (`createElement`/`textContent`) |
+| 5 | Medium | 58 `no-explicit-any` lint warnings in editor/collab paths | ✅ **Resolved** — typed with `PMNode`, `Editor`, `Range`, `SuggestionProps` from TipTap; 4 remaining are TipTap extension API patterns that require `any` |
+| 6 | Low | 2 remaining dependency vulnerabilities | Tracked — locked by upstream (`markdown-it` via TipTap, `qs` via supertest) |
 | 7 | Low | Dynamic ORDER BY (already guarded with whitelist) | No action needed |
 
 ### Phase 6 Totals
@@ -1294,7 +1294,7 @@ BEFORE — CSRF session storage               AFTER — CSRF session storage
 |--------|-------|
 | Commits | 3 |
 | Files changed | 8 |
-| Security findings resolved | 2 (both High severity) |
+| Security findings resolved | 4 (2 High + 2 Medium severity) |
 | New tests | 3 |
 | New migration | 1 (`038_http_sessions_table.sql`) |
 | New dependency | 1 (`connect-pg-simple`) |

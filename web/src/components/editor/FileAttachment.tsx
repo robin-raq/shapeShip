@@ -3,7 +3,8 @@
  * Handles file attachments (PDF, DOCX, etc.) as embedded cards with download links
  * Supports drag-and-drop and paste for non-image files
  */
-import { Node, mergeAttributes } from '@tiptap/core';
+import { Node, mergeAttributes, Editor } from '@tiptap/core';
+import { Node as PMNode } from '@tiptap/pm/model';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import { uploadFile, isAllowedFileType, getMimeTypeFromExtension, isImageFile, MAX_FILE_SIZE, MAX_FILE_SIZE_DISPLAY } from '@/services/upload';
@@ -200,7 +201,7 @@ export const FileAttachmentExtension = Node.create({
  * @param file - File to upload
  * @param signal - Optional AbortSignal for cancelling uploads on navigation/cleanup
  */
-async function handleFileUpload(editor: any, file: File, signal?: AbortSignal) {
+async function handleFileUpload(editor: Editor, file: File, signal?: AbortSignal) {
   // Check if already aborted
   if (signal?.aborted) {
     return;
@@ -229,10 +230,8 @@ async function handleFileUpload(editor: any, file: File, signal?: AbortSignal) {
   registerUpload(uploadId, file.name);
 
   // Insert placeholder with uploading state
-  editor
-    .chain()
-    .focus()
-    .setFileAttachment({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TipTap extension commands are dynamically registered
+  (editor.chain().focus() as any).setFileAttachment({
       filename: file.name,
       url: '',
       size: file.size,
@@ -258,7 +257,7 @@ async function handleFileUpload(editor: any, file: File, signal?: AbortSignal) {
     const { state, view } = editor;
     let attachmentPos: number | null = null;
 
-    state.doc.descendants((node: any, nodePos: number) => {
+    state.doc.descendants((node: PMNode, nodePos: number) => {
       if (
         node.type.name === 'fileAttachment' &&
         node.attrs.filename === file.name &&
@@ -306,7 +305,7 @@ async function handleFileUpload(editor: any, file: File, signal?: AbortSignal) {
     const { state, view } = editor;
     let attachmentPos: number | null = null;
 
-    state.doc.descendants((node: any, nodePos: number) => {
+    state.doc.descendants((node: PMNode, nodePos: number) => {
       if (
         node.type.name === 'fileAttachment' &&
         node.attrs.filename === file.name &&
@@ -330,7 +329,7 @@ async function handleFileUpload(editor: any, file: File, signal?: AbortSignal) {
  * @param editor - TipTap editor instance
  * @param signal - Optional AbortSignal for cancelling uploads on navigation/cleanup
  */
-export function triggerFileUpload(editor: any, signal?: AbortSignal) {
+export function triggerFileUpload(editor: Editor, signal?: AbortSignal) {
   // Check if already aborted
   if (signal?.aborted) {
     return;

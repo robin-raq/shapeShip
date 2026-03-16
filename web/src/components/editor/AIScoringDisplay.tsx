@@ -1,5 +1,6 @@
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Node as PMNode } from '@tiptap/pm/model';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
 /**
@@ -11,7 +12,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
  * by text similarity, then renders score indicators and feedback inline.
  */
 
-interface PlanItemAnalysis {
+export interface PlanItemAnalysis {
   text: string;
   score: number;
   feedback: string;
@@ -28,7 +29,7 @@ interface PlanAnalysisData {
   workload_feedback: string;
 }
 
-interface RetroItemAnalysis {
+export interface RetroItemAnalysis {
   plan_item: string;
   addressed: boolean;
   has_evidence: boolean;
@@ -48,23 +49,25 @@ interface AIScoringStorage {
 
 export const aiScoringPluginKey = new PluginKey('aiScoringDisplay');
 
-function escapeHtml(str: string): string {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+/** Create a span element with className and text content */
+export function span(className: string, text: string): HTMLSpanElement {
+  const node = document.createElement('span');
+  node.className = className;
+  node.textContent = text;
+  return node;
 }
 
 /** Extract plain text from a ProseMirror node */
-function extractNodeText(node: any): string {
+function extractNodeText(node: PMNode): string {
   let text = '';
-  node.descendants((child: any) => {
+  node.descendants((child: PMNode) => {
     if (child.isText) text += child.text;
   });
   return text.trim();
 }
 
 /** Normalize text for matching */
-function normalizeText(text: string): string {
+export function normalizeText(text: string): string {
   return text.toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
@@ -72,10 +75,10 @@ function normalizeText(text: string): string {
  * Find list items in the document and return their positions and text.
  * Returns array of { pos: end position of list item block, text: extracted text }
  */
-function findListItems(doc: any): Array<{ endPos: number; text: string }> {
+function findListItems(doc: PMNode): Array<{ endPos: number; text: string }> {
   const items: Array<{ endPos: number; text: string }> = [];
 
-  doc.descendants((node: any, pos: number) => {
+  doc.descendants((node: PMNode, pos: number) => {
     if (node.type.name === 'listItem' || node.type.name === 'taskItem') {
       const text = extractNodeText(node);
       if (text) {
@@ -93,10 +96,10 @@ function findListItems(doc: any): Array<{ endPos: number; text: string }> {
  * Find planReference nodes in the document (for retro documents).
  * Returns array of { endPos, text } using the planItemText attribute.
  */
-function findPlanReferenceNodes(doc: any): Array<{ endPos: number; text: string }> {
+function findPlanReferenceNodes(doc: PMNode): Array<{ endPos: number; text: string }> {
   const items: Array<{ endPos: number; text: string }> = [];
 
-  doc.descendants((node: any, pos: number) => {
+  doc.descendants((node: PMNode, pos: number) => {
     if (node.type.name === 'planReference') {
       const text = node.attrs.planItemText || '';
       if (text) {
@@ -114,7 +117,7 @@ function findPlanReferenceNodes(doc: any): Array<{ endPos: number; text: string 
  * Match analysis items to document list items by text similarity.
  * Returns a map of listItemIndex -> analysisItemIndex.
  */
-function matchAnalysisToListItems(
+export function matchAnalysisToListItems(
   listItems: Array<{ endPos: number; text: string }>,
   analysisItems: Array<{ text: string }>
 ): Map<number, number> {
@@ -164,8 +167,11 @@ function matchAnalysisToListItems(
   return matches;
 }
 
+/** Status icon characters for retro coverage */
+const STATUS_ICONS = { full: '\u2713', partial: '\u26A0', none: '\u2717' } as const;
+
 /** Create DOM element for plan item feedback widget */
-function createPlanFeedbackWidget(item: PlanItemAnalysis): HTMLElement {
+export function createPlanFeedbackWidget(item: PlanItemAnalysis): HTMLElement {
   const container = document.createElement('div');
   container.className = 'ai-scoring-inline';
   container.contentEditable = 'false';
@@ -173,24 +179,20 @@ function createPlanFeedbackWidget(item: PlanItemAnalysis): HTMLElement {
   const scorePercent = Math.round(item.score * 10);
   const colorClass = item.score >= 0.7 ? 'green' : item.score >= 0.4 ? 'yellow' : 'red';
 
-  let conciseness = '';
+  const feedback = document.createElement('div');
+  feedback.className = `ai-scoring-feedback ai-scoring-${colorClass}`;
+  feedback.appendChild(span('ai-scoring-badge', String(scorePercent)));
+  feedback.appendChild(span('ai-scoring-text', item.feedback));
   if (item.is_verbose && item.conciseness_feedback) {
-    conciseness = `<span class="ai-scoring-conciseness">${escapeHtml(item.conciseness_feedback)}</span>`;
+    feedback.appendChild(span('ai-scoring-conciseness', item.conciseness_feedback));
   }
-
-  container.innerHTML = `
-    <div class="ai-scoring-feedback ai-scoring-${colorClass}">
-      <span class="ai-scoring-badge">${scorePercent}</span>
-      <span class="ai-scoring-text">${escapeHtml(item.feedback)}</span>
-      ${conciseness}
-    </div>
-  `;
+  container.appendChild(feedback);
 
   return container;
 }
 
 /** Create DOM element for retro item coverage widget */
-function createRetroCoverageWidget(item: RetroItemAnalysis): HTMLElement {
+export function createRetroCoverageWidget(item: RetroItemAnalysis): HTMLElement {
   const container = document.createElement('div');
   container.className = 'ai-scoring-inline';
   container.contentEditable = 'false';
@@ -199,16 +201,15 @@ function createRetroCoverageWidget(item: RetroItemAnalysis): HTMLElement {
     : item.addressed ? 'yellow'
     : 'red';
 
-  const statusIcon = item.addressed && item.has_evidence ? '&#10003;'
-    : item.addressed ? '&#9888;'
-    : '&#10007;';
+  const statusIcon = item.addressed && item.has_evidence ? STATUS_ICONS.full
+    : item.addressed ? STATUS_ICONS.partial
+    : STATUS_ICONS.none;
 
-  container.innerHTML = `
-    <div class="ai-scoring-feedback ai-scoring-${statusClass}">
-      <span class="ai-scoring-status-icon">${statusIcon}</span>
-      <span class="ai-scoring-text">${escapeHtml(item.feedback)}</span>
-    </div>
-  `;
+  const feedback = document.createElement('div');
+  feedback.className = `ai-scoring-feedback ai-scoring-${statusClass}`;
+  feedback.appendChild(span('ai-scoring-status-icon', statusIcon));
+  feedback.appendChild(span('ai-scoring-text', item.feedback));
+  container.appendChild(feedback);
 
   return container;
 }
