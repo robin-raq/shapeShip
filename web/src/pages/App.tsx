@@ -36,6 +36,7 @@ import { SelectionPersistenceProvider } from '@/contexts/SelectionPersistenceCon
 import { ActionItemsModal } from '@/components/ActionItemsModal';
 import { AccountabilityBanner } from '@/components/AccountabilityBanner';
 import { ProjectContextSidebar } from '@/components/sidebars/ProjectContextSidebar';
+import { FleetGraphPanel } from '@/components/agent/FleetGraphPanel';
 
 type Mode = 'docs' | 'issues' | 'projects' | 'programs' | 'sprints' | 'team' | 'settings' | 'dashboard' | 'project-context';
 
@@ -575,6 +576,7 @@ export function AppLayout() {
         open={actionItemsModalOpen}
         onClose={() => setActionItemsModalOpen(false)}
       />
+      <FleetGraphPanel />
     </div>
     </SelectionPersistenceProvider>
     </TooltipProvider>
