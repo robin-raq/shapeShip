@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
+import { useCurrentDocument } from '../../contexts/CurrentDocumentContext';
 
 type ShipTarget = 'local' | 'prod';
 type SidebarTab = 'chat' | 'scan';
@@ -509,6 +511,8 @@ function ProactiveScanTab() {
 
 function ChatTab() {
   const location = useLocation();
+  const { user } = useAuth();
+  const { currentDocumentType, currentDocumentId, currentDocumentProjectId } = useCurrentDocument();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -568,6 +572,13 @@ function ChatTab() {
             pathname: location.pathname,
             entityType: routeContext.entityType,
             entityId: routeContext.entityId,
+            // Enriched context from Ship's React state
+            userId: user?.id,
+            userName: user?.name,
+            userEmail: user?.email,
+            documentType: currentDocumentType,
+            documentId: currentDocumentId,
+            projectId: currentDocumentProjectId,
           },
         }),
       });
@@ -617,6 +628,8 @@ function ChatTab() {
       <div className="border-b border-border px-3 py-1.5">
         <div className="text-[10px] text-muted">
           Context: <code className="text-foreground/60">{location.pathname}</code>
+          {user?.name && <span className="ml-1 text-foreground/40">as {user.name}</span>}
+          {currentDocumentType && <span className="ml-1 text-foreground/40">({currentDocumentType})</span>}
         </div>
       </div>
 
