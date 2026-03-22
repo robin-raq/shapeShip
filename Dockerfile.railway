@@ -34,6 +34,11 @@ COPY shared/ ./shared/
 COPY api/ ./api/
 COPY web/ ./web/
 
+# Pass VITE_* env vars as build args so Vite bakes them into the frontend bundle.
+# Railway injects these automatically when ARG name matches an env var.
+ARG VITE_FLEETGRAPH_API_URL
+ENV VITE_FLEETGRAPH_API_URL=$VITE_FLEETGRAPH_API_URL
+
 # Build all packages: shared types → API + Web
 # shared must build first (api and web import from @ship/shared)
 RUN pnpm build
