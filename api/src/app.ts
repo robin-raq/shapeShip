@@ -128,7 +128,7 @@ export function createApp(corsOrigin: string = 'http://localhost:5173'): express
         scriptSrc: ["'self'", "'unsafe-inline'"], // Admin credentials page uses inline scripts
         styleSrc: ["'self'", "'unsafe-inline'"], // TipTap editor needs inline styles
         imgSrc: ["'self'", "data:", "blob:", "https:"],
-        connectSrc: ["'self'", "wss:", "ws:"], // WebSocket connections
+        connectSrc: ["'self'", "wss:", "ws:", "https://fleetgraph-production-89ba.up.railway.app"], // WebSocket + FleetGraph agent
         fontSrc: ["'self'", "data:"],
         objectSrc: ["'none'"],
         frameSrc: ["'none'"],
