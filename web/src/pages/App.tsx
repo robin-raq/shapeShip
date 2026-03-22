@@ -36,9 +36,9 @@ import { SelectionPersistenceProvider } from '@/contexts/SelectionPersistenceCon
 import { ActionItemsModal } from '@/components/ActionItemsModal';
 import { AccountabilityBanner } from '@/components/AccountabilityBanner';
 import { ProjectContextSidebar } from '@/components/sidebars/ProjectContextSidebar';
-import { FleetGraphPanel } from '@/components/agent/FleetGraphPanel';
+import { FleetGraphSidebar, useFleetGraphBadge } from '@/components/agent/FleetGraphPanel';
 
-type Mode = 'docs' | 'issues' | 'projects' | 'programs' | 'sprints' | 'team' | 'settings' | 'dashboard' | 'project-context';
+type Mode = 'docs' | 'issues' | 'projects' | 'programs' | 'sprints' | 'team' | 'settings' | 'dashboard' | 'project-context' | 'fleetgraph';
 
 export function AppLayout() {
   const { user, logout, isSuperAdmin, impersonating, endImpersonation } = useAuth();
@@ -57,6 +57,7 @@ export function AppLayout() {
   const [projectSetupWizardOpen, setProjectSetupWizardOpen] = useState(false);
   const [actionItemsModalOpen, setActionItemsModalOpen] = useState(false);
   const [actionItemsModalShownOnLoad, setActionItemsModalShownOnLoad] = useState(false);
+  const [fleetGraphActive, setFleetGraphActive] = useState(false);
 
   // Session timeout handling
   const handleSessionTimeout = useCallback(() => {
@@ -80,6 +81,9 @@ export function AppLayout() {
   const { data: actionItemsData } = useActionItemsQuery();
   const hasActionItems = (actionItemsData?.items?.length ?? 0) > 0;
   const queryClient = useQueryClient();
+
+  // FleetGraph proactive badge — polls every 5 minutes for project health findings
+  const fleetGraphBadgeCount = useFleetGraphBadge();
 
   // Celebration state for when user completes an accountability item
   const [isCelebrating, setIsCelebrating] = useState(false);
@@ -150,6 +154,7 @@ export function AppLayout() {
 
   // Determine active mode from path or document type
   const getActiveMode = (): Mode => {
+    if (fleetGraphActive) return 'fleetgraph';
     if (location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/my-week')) return 'dashboard';
     // For /documents/:id routes, use document type from context
     if (location.pathname.startsWith('/documents/')) {
@@ -202,6 +207,7 @@ export function AppLayout() {
   const activeDocumentId = getActiveDocumentId();
 
   const handleModeClick = (mode: Mode) => {
+    setFleetGraphActive(false);
     switch (mode) {
       case 'dashboard': navigate('/my-week'); break;
       case 'docs': navigate('/docs'); break;
@@ -403,6 +409,16 @@ export function AppLayout() {
           {/* User avatar & settings at bottom */}
           <div className="flex flex-col items-center gap-2">
             <RailIcon
+              icon={<FleetGraphIcon />}
+              label={fleetGraphBadgeCount > 0 ? `FleetGraph (${fleetGraphBadgeCount} findings)` : 'FleetGraph'}
+              active={activeMode === 'fleetgraph'}
+              onClick={() => {
+                setFleetGraphActive((prev) => !prev);
+                if (leftSidebarCollapsed) setLeftSidebarCollapsed(false);
+              }}
+              showBadge={fleetGraphBadgeCount > 0}
+            />
+            <RailIcon
               icon={<SettingsIcon />}
               label="Settings"
               active={activeMode === 'settings'}
@@ -439,6 +455,7 @@ export function AppLayout() {
                 {activeMode === 'team' && 'Teams'}
                 {activeMode === 'settings' && 'Settings'}
                 {activeMode === 'project-context' && 'Project'}
+                {activeMode === 'fleetgraph' && 'FleetGraph'}
               </h2>
               <div className="flex items-center gap-1">
                 {activeMode === 'docs' && (
@@ -533,6 +550,9 @@ export function AppLayout() {
                   activeDocumentId={activeDocumentId}
                 />
               )}
+              {activeMode === 'fleetgraph' && (
+                <FleetGraphSidebar />
+              )}
             </div>
 
           </div>
@@ -576,7 +596,6 @@ export function AppLayout() {
         open={actionItemsModalOpen}
         onClose={() => setActionItemsModalOpen(false)}
       />
-      <FleetGraphPanel />
     </div>
     </SelectionPersistenceProvider>
     </TooltipProvider>
@@ -1808,6 +1827,14 @@ function TeamIcon() {
   return (
     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  );
+}
+
+function FleetGraphIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
     </svg>
   );
 }
