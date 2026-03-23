@@ -1242,6 +1242,210 @@ async function seed() {
       console.log(`✅ Created ${weeklyRetrosCreated} weekly retros`);
     }
 
+    // ──────────────────────────────────────────────────────────
+    // FleetGraph detector scenarios
+    // Creates data that triggers all 8 detectors in a proactive scan
+    // ──────────────────────────────────────────────────────────
+    console.log('');
+    console.log('🤖 Seeding FleetGraph detector scenarios...');
+
+    // Check if FleetGraph scenarios already seeded
+    const fgCheck = await pool.query(
+      `SELECT id FROM documents WHERE workspace_id = $1 AND title = $2 AND document_type = 'issue'`,
+      [workspaceId, '[FG] Overdue: Legacy migration']
+    );
+
+    if (fgCheck.rows[0]) {
+      console.log('ℹ️  FleetGraph scenarios already seeded');
+    } else {
+      // Get user IDs for assignments
+      const aliceResult = await pool.query(`SELECT id FROM users WHERE email = 'alice.chen@ship.local'`);
+      const aliceId = aliceResult.rows[0]?.id;
+      const bobResult = await pool.query(`SELECT id FROM users WHERE email = 'bob.martinez@ship.local'`);
+      const bobId = bobResult.rows[0]?.id;
+
+      // Get first program and project for associations
+      const programResult = await pool.query(
+        `SELECT id FROM documents WHERE workspace_id = $1 AND document_type = 'program' LIMIT 1`,
+        [workspaceId]
+      );
+      const programId = programResult.rows[0]?.id;
+
+      const projectResult = await pool.query(
+        `SELECT id FROM documents WHERE workspace_id = $1 AND document_type = 'project' LIMIT 1`,
+        [workspaceId]
+      );
+      const projectId = projectResult.rows[0]?.id;
+
+      // Get current max ticket number
+      const maxTicketResult = await pool.query(
+        `SELECT COALESCE(MAX(ticket_number), 100) as max_ticket FROM documents WHERE workspace_id = $1 AND document_type = 'issue'`,
+        [workspaceId]
+      );
+      let fgTicket = maxTicketResult.rows[0].max_ticket + 1;
+
+      // ── Detector 1: stale_issue ──
+      // 2 issues backdated 5 days, state=todo, no recent activity
+      for (const title of ['[FG] Stale: Database index optimization', '[FG] Stale: Update API documentation']) {
+        const result = await pool.query(
+          `INSERT INTO documents (workspace_id, document_type, title, properties, ticket_number, created_at, updated_at)
+           VALUES ($1, 'issue', $2, $3, $4, NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days')
+           RETURNING id`,
+          [workspaceId, title, JSON.stringify({ state: 'todo', priority: 'medium', source: 'internal', assignee_id: bobId }), fgTicket++]
+        );
+        if (programId) await createAssociation(pool, result.rows[0].id, programId, 'program');
+        if (projectId) await createAssociation(pool, result.rows[0].id, projectId, 'project');
+      }
+      console.log('  ✅ Detector 1: stale_issue — 2 issues backdated 5 days');
+
+      // ── Detector 2: sprint_health ──
+      // Active sprint ending tomorrow with 10 open issues
+      const atRiskSprintResult = await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, properties)
+         VALUES ($1, 'sprint', '[FG] At-Risk Sprint', $2)
+         RETURNING id`,
+        [workspaceId, JSON.stringify({
+          sprint_number: 999,
+          status: 'active',
+          owner_id: aliceId,
+          has_plan: true,
+          planned_issue_ids: [], // Will fill after creating issues
+        })]
+      );
+      const atRiskSprintId = atRiskSprintResult.rows[0].id;
+      if (projectId) await createAssociation(pool, atRiskSprintId, projectId, 'project');
+      if (programId) await createAssociation(pool, atRiskSprintId, programId, 'program');
+
+      // Update sprint dates via raw SQL (properties doesn't store dates, the API computes them,
+      // but FleetGraph reads start_date/end_date from the weeks API which computes from sprint_number)
+      // We need the API to return end_date within 3 days, so we set sprint_number to produce that.
+      // Alternative: override via properties since FleetGraph reads from API response
+      // Actually FleetGraph reads the /api/weeks endpoint which returns computed dates.
+      // The safest approach is to set properties that the API will return directly.
+      await pool.query(
+        `UPDATE documents SET properties = properties || $1::jsonb WHERE id = $2`,
+        [JSON.stringify({
+          start_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          end_date: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        }), atRiskSprintId]
+      );
+
+      // Create 10 open issues for this sprint
+      const sprintIssueIds: string[] = [];
+      const sprintIssueTitles = [
+        'Refactor auth middleware', 'Fix pagination bug', 'Add rate limiting',
+        'Update error messages', 'Migrate legacy endpoints', 'Add input sanitization',
+        'Create health check', 'Fix memory leak', 'Update dependencies', 'Add logging',
+      ];
+      for (const title of sprintIssueTitles) {
+        const result = await pool.query(
+          `INSERT INTO documents (workspace_id, document_type, title, properties, ticket_number)
+           VALUES ($1, 'issue', $2, $3, $4)
+           RETURNING id`,
+          [workspaceId, `[FG] ${title}`, JSON.stringify({
+            state: 'todo',
+            priority: 'medium',
+            source: 'internal',
+            assignee_id: aliceId,
+          }), fgTicket++]
+        );
+        const issueId = result.rows[0].id;
+        sprintIssueIds.push(issueId);
+        await createAssociation(pool, issueId, atRiskSprintId, 'sprint');
+        if (programId) await createAssociation(pool, issueId, programId, 'program');
+        if (projectId) await createAssociation(pool, issueId, projectId, 'project');
+      }
+      console.log('  ✅ Detector 2: sprint_health — active sprint ending tomorrow with 10 open issues');
+
+      // ── Detector 7: scope_creep ──
+      // Set planned_issue_ids to first 5 issues, leaving 5 unplanned (>2 threshold)
+      await pool.query(
+        `UPDATE documents SET properties = properties || $1::jsonb WHERE id = $2`,
+        [JSON.stringify({ planned_issue_ids: sprintIssueIds.slice(0, 5) }), atRiskSprintId]
+      );
+      console.log('  ✅ Detector 7: scope_creep — 5 unplanned issues in sprint with plan');
+
+      // ── Detector 3: unassigned_high_priority ──
+      // 2 critical issues with no assignee
+      for (const title of ['[FG] Unassigned: Critical security patch', '[FG] Unassigned: Production outage fix']) {
+        const result = await pool.query(
+          `INSERT INTO documents (workspace_id, document_type, title, properties, ticket_number)
+           VALUES ($1, 'issue', $2, $3, $4)
+           RETURNING id`,
+          [workspaceId, title, JSON.stringify({ state: 'todo', priority: 'critical', source: 'internal', assignee_id: null }), fgTicket++]
+        );
+        if (programId) await createAssociation(pool, result.rows[0].id, programId, 'program');
+        if (projectId) await createAssociation(pool, result.rows[0].id, projectId, 'project');
+      }
+      console.log('  ✅ Detector 3: unassigned_high_priority — 2 critical issues with no assignee');
+
+      // ── Detector 5: overdue_issue ──
+      // 2 issues with due_date 2 days ago
+      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      for (const title of ['[FG] Overdue: Legacy migration', '[FG] Overdue: Compliance report']) {
+        const result = await pool.query(
+          `INSERT INTO documents (workspace_id, document_type, title, properties, ticket_number)
+           VALUES ($1, 'issue', $2, $3, $4)
+           RETURNING id`,
+          [workspaceId, title, JSON.stringify({
+            state: 'in_progress',
+            priority: 'high',
+            source: 'internal',
+            assignee_id: bobId,
+            due_date: twoDaysAgo,
+          }), fgTicket++]
+        );
+        if (programId) await createAssociation(pool, result.rows[0].id, programId, 'program');
+        if (projectId) await createAssociation(pool, result.rows[0].id, projectId, 'project');
+      }
+      console.log('  ✅ Detector 5: overdue_issue — 2 issues past due_date');
+
+      // ── Detector 6: work_distribution ──
+      // Assign 12 additional open issues to Alice to create imbalance
+      // (She already has the 10 sprint issues above, plus these 12 = 22 total)
+      for (let i = 0; i < 12; i++) {
+        const result = await pool.query(
+          `INSERT INTO documents (workspace_id, document_type, title, properties, ticket_number)
+           VALUES ($1, 'issue', $2, $3, $4)
+           RETURNING id`,
+          [workspaceId, `[FG] Workload: Task ${i + 1} for Alice`, JSON.stringify({
+            state: 'todo',
+            priority: 'medium',
+            source: 'internal',
+            assignee_id: aliceId,
+          }), fgTicket++]
+        );
+        if (programId) await createAssociation(pool, result.rows[0].id, programId, 'program');
+      }
+      console.log('  ✅ Detector 6: work_distribution — Alice has 22+ open issues (others have ~3-5)');
+
+      // ── Detector 8: no_sprint_plan ──
+      // Second active sprint with has_plan = false
+      const noPlanSprintResult = await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, properties)
+         VALUES ($1, 'sprint', '[FG] Sprint Without Plan', $2)
+         RETURNING id`,
+        [workspaceId, JSON.stringify({
+          sprint_number: 998,
+          status: 'active',
+          owner_id: bobId,
+          has_plan: false,
+          start_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          end_date: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        })]
+      );
+      if (projectId) await createAssociation(pool, noPlanSprintResult.rows[0].id, projectId, 'project');
+      if (programId) await createAssociation(pool, noPlanSprintResult.rows[0].id, programId, 'program');
+      console.log('  ✅ Detector 8: no_sprint_plan — active sprint with has_plan=false');
+
+      // ── Detector 4: missed_standup ──
+      // Already works: only 3 of 11 team members have standups.
+      // No additional seeding needed — the existing data triggers this.
+      console.log('  ✅ Detector 4: missed_standup — 8 of 11 members have no standup (existing data)');
+
+      console.log('✅ All 8 FleetGraph detector scenarios seeded');
+    }
+
     console.log('');
     console.log('🎉 Seed complete!');
     console.log('');
