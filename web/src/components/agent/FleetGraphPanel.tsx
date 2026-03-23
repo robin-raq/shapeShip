@@ -58,7 +58,7 @@ interface ChatMessage {
   tracePath?: string;
 }
 
-function parseRouteContext(pathname: string): { entityType: string; entityId?: string } {
+export function parseRouteContext(pathname: string): { entityType: string; entityId?: string } {
   const patterns: Array<[RegExp, string]> = [
     [/^\/issues\/([^/]+)/, 'issue'],
     [/^\/projects\/([^/]+)/, 'project'],
@@ -83,11 +83,42 @@ const CONTEXTUAL_PROMPTS: Record<string, string[]> = {
   unknown:   ['What should I focus on?', 'Summarize recent activity'],
 };
 
-function getSuggestedPrompts(pathname: string, entityType: string): string[] {
+export function getSuggestedPrompts(pathname: string, entityType: string): string[] {
   if (pathname.startsWith('/dashboard') || pathname.startsWith('/my-week') || pathname === '/') {
     return CONTEXTUAL_PROMPTS.dashboard;
   }
   return CONTEXTUAL_PROMPTS[entityType] ?? CONTEXTUAL_PROMPTS.unknown;
+}
+
+export interface ChatContext {
+  pathname: string;
+  entityType: string;
+  entityId?: string;
+  userId?: string;
+  userName?: string;
+  userEmail?: string;
+  documentType?: string | null;
+  documentId?: string | null;
+  projectId?: string | null;
+}
+
+export function buildChatContext(
+  pathname: string,
+  user: { id: string; name: string; email: string } | null,
+  doc: { type: string | null; id: string | null; projectId: string | null },
+): ChatContext {
+  const route = parseRouteContext(pathname);
+  return {
+    pathname,
+    entityType: route.entityType,
+    entityId: route.entityId,
+    userId: user?.id,
+    userName: user?.name,
+    userEmail: user?.email,
+    documentType: doc.type,
+    documentId: doc.id,
+    projectId: doc.projectId,
+  };
 }
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -568,18 +599,11 @@ function ChatTab() {
         body: JSON.stringify({
           target,
           message: text.trim(),
-          context: {
-            pathname: location.pathname,
-            entityType: routeContext.entityType,
-            entityId: routeContext.entityId,
-            // Enriched context from Ship's React state
-            userId: user?.id,
-            userName: user?.name,
-            userEmail: user?.email,
-            documentType: currentDocumentType,
-            documentId: currentDocumentId,
-            projectId: currentDocumentProjectId,
-          },
+          context: buildChatContext(
+            location.pathname,
+            user,
+            { type: currentDocumentType, id: currentDocumentId, projectId: currentDocumentProjectId },
+          ),
         }),
       });
 
